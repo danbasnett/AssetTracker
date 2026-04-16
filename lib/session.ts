@@ -17,7 +17,7 @@ export const sessionOptions: SessionOptions = {
   cookieName: 'assettracker-session',
   cookieOptions: {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
+    secure: process.env.COOKIE_SECURE === 'true',
     sameSite: 'lax',
     maxAge: 60 * 60 * 8, // 8 hours
   },
