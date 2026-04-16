@@ -4,7 +4,7 @@ import { useActionState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { login, createFirstUser } from '../app/actions'
 
-export default function LoginForm({ isFirstTime, from }: { isFirstTime: boolean; from: string }) {
+export default function LoginForm({ isFirstTime, from, logoUrl }: { isFirstTime: boolean; from: string; logoUrl?: string }) {
   const [loginState, loginAction] = useActionState(login, null)
   const [setupState, setupAction] = useActionState(createFirstUser, null)
   const router = useRouter()
@@ -15,10 +15,15 @@ export default function LoginForm({ isFirstTime, from }: { isFirstTime: boolean;
     if ((state as any)?.success) router.push(from || '/')
   }, [state])
 
+  const logo = logoUrl ? (
+    <img src={logoUrl} alt="Logo" className="max-h-24 max-w-full object-contain mb-8" />
+  ) : null
+
   if (isFirstTime) {
     return (
       <div className="min-h-screen bg-zinc-950 flex items-center justify-center p-4">
         <div className="w-full max-w-sm">
+          {logo}
           <h1 className="text-2xl font-semibold text-white mb-1">Welcome</h1>
           <p className="text-zinc-400 text-sm mb-8">Create your admin account to get started.</p>
 
@@ -57,6 +62,7 @@ export default function LoginForm({ isFirstTime, from }: { isFirstTime: boolean;
   return (
     <div className="min-h-screen bg-zinc-950 flex items-center justify-center p-4">
       <div className="w-full max-w-sm">
+        {logo}
         <h1 className="text-2xl font-semibold text-white mb-1">Sign in</h1>
         <p className="text-zinc-400 text-sm mb-8">Asset Tracker</p>
 
