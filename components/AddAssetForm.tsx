@@ -3,10 +3,7 @@
 import { useActionState, useState } from 'react'
 import { addAsset } from '../app/actions'
 
-type Location = {
-  id: number
-  name: string
-}
+type Location = { id: number; name: string }
 
 export default function AddAssetForm({ locations }: { locations: Location[] }) {
   const [state, formAction] = useActionState(addAsset, null)
@@ -14,6 +11,11 @@ export default function AddAssetForm({ locations }: { locations: Location[] }) {
   const [assetTag, setAssetTag] = useState('')
   const [status, setStatus] = useState('available')
   const [locationId, setLocationId] = useState('')
+  const [serialNumber, setSerialNumber] = useState('')
+  const [modelNumber, setModelNumber] = useState('')
+  const [supplier, setSupplier] = useState('')
+  const [purchaseDate, setPurchaseDate] = useState('')
+  const [value, setValue] = useState('')
 
   return (
     <form action={formAction} className="mt-4 flex flex-col gap-3">
@@ -25,6 +27,16 @@ export default function AddAssetForm({ locations }: { locations: Location[] }) {
           className="rounded-xl bg-zinc-800 px-4 py-2 text-white placeholder-zinc-500 border border-zinc-700" />
         <input name="assetTag" placeholder="Tag e.g. DRILL-001" required value={assetTag} onChange={e => setAssetTag(e.target.value)}
           className="rounded-xl bg-zinc-800 px-4 py-2 text-white placeholder-zinc-500 border border-zinc-700" />
+        <input name="serialNumber" placeholder="Serial number" value={serialNumber} onChange={e => setSerialNumber(e.target.value)}
+          className="rounded-xl bg-zinc-800 px-4 py-2 text-white placeholder-zinc-500 border border-zinc-700" />
+        <input name="modelNumber" placeholder="Model number" value={modelNumber} onChange={e => setModelNumber(e.target.value)}
+          className="rounded-xl bg-zinc-800 px-4 py-2 text-white placeholder-zinc-500 border border-zinc-700" />
+        <input name="supplier" placeholder="Supplier" value={supplier} onChange={e => setSupplier(e.target.value)}
+          className="rounded-xl bg-zinc-800 px-4 py-2 text-white placeholder-zinc-500 border border-zinc-700" />
+        <input name="purchaseDate" type="date" value={purchaseDate} onChange={e => setPurchaseDate(e.target.value)}
+          className="rounded-xl bg-zinc-800 px-4 py-2 text-white border border-zinc-700" />
+        <input name="value" type="number" min="0" step="0.01" placeholder="Value (£)" value={value} onChange={e => setValue(e.target.value)}
+          className="rounded-xl bg-zinc-800 px-4 py-2 text-white placeholder-zinc-500 border border-zinc-700 w-32" />
         <select name="status" value={status} onChange={e => setStatus(e.target.value)}
           className="rounded-xl bg-zinc-800 px-4 py-2 text-white border border-zinc-700">
           <option value="available">Available</option>
@@ -32,17 +44,14 @@ export default function AddAssetForm({ locations }: { locations: Location[] }) {
           <option value="repair">Repair</option>
           <option value="retired">Retired</option>
         </select>
-        <select
-	  name="locationId"
-	  value={locationId}
-	  onChange={e => setLocationId(e.target.value)}
-	  className="rounded-xl bg-zinc-800 px-4 py-2 pr-8 text-white border border-zinc-700">
-	  <option value="">No location</option>
-	  {locations.map(loc => (
-	    <option key={loc.id} value={loc.id}>{loc.name}</option>
-	  ))}
-	</select>
-	  <button type="submit"
+        <select name="locationId" value={locationId} onChange={e => setLocationId(e.target.value)}
+          className="rounded-xl bg-zinc-800 px-4 py-2 text-white border border-zinc-700">
+          <option value="">No location</option>
+          {locations.map(loc => (
+            <option key={loc.id} value={loc.id}>{loc.name}</option>
+          ))}
+        </select>
+        <button type="submit"
           className="rounded-xl bg-white px-4 py-2 text-black font-medium">
           Add Asset
         </button>

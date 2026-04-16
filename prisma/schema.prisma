@@ -7,30 +7,41 @@ datasource db {
 }
 
 model Location {
-  id        Int      @id @default(autoincrement())
-  name      String
-  parentId  Int?
-  parent    Location? @relation("LocationChildren", fields: [parentId], references: [id])
-  children  Location[] @relation("LocationChildren")
-  createdAt DateTime @default(now())
-  assets    Asset[]
+  id          Int          @id @default(autoincrement())
+  name        String
+  parentId    Int?
+  parent      Location?    @relation("LocationChildren", fields: [parentId], references: [id])
+  children    Location[]   @relation("LocationChildren")
+  createdAt   DateTime     @default(now())
+  assets      Asset[]
+  consumables Consumable[]
 }
 
 model Asset {
-  id         Int      @id @default(autoincrement())
-  name       String
-  assetTag   String   @unique
-  status     String   @default("available")
-  locationId Int?
-  location   Location? @relation(fields: [locationId], references: [id])
-  createdAt  DateTime @default(now())
+  id           Int       @id @default(autoincrement())
+  name         String
+  assetTag     String    @unique
+  status       String    @default("available")
+  locationId   Int?
+  location     Location? @relation(fields: [locationId], references: [id])
+  serialNumber String?
+  modelNumber  String?
+  supplier     String?
+  purchaseDate DateTime?
+  value        Float?
+  notes        String?
+  createdAt    DateTime  @default(now())
 }
 
 model Consumable {
-  id             Int      @id @default(autoincrement())
+  id             Int       @id @default(autoincrement())
   name           String
-  quantity       Int      @default(0)
-  reorderPoint   Int      @default(5)
-  unit           String   @default("each")
-  createdAt      DateTime @default(now())
+  quantity       Int       @default(0)
+  reorderPoint   Int       @default(5)
+  unit           String    @default("each")
+  modelNumber    String?
+  notes          String?
+  locationId     Int?
+  location       Location? @relation(fields: [locationId], references: [id])
+  createdAt      DateTime  @default(now())
 }

@@ -24,7 +24,7 @@ export default function Sidebar() {
     { href: '/', label: 'Home', icon: Home },
     { href: '/assets', label: 'Assets', icon: Table },
     { href: '/locations', label: 'Locations', icon: MapPin },
-    { href: '/items', label: 'Item', icon: Package}
+    { href: '/items', label: 'Consumables', icon: Package}
   ]
 
   return (

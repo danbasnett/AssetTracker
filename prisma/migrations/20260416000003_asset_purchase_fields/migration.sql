@@ -1,0 +1,4 @@
+-- AlterTable
+ALTER TABLE "Asset" ADD COLUMN "supplier" TEXT;
+ALTER TABLE "Asset" ADD COLUMN "purchaseDate" TIMESTAMP(3);
+ALTER TABLE "Asset" ADD COLUMN "value" DOUBLE PRECISION;
