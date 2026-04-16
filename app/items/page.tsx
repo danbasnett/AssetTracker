@@ -1,6 +1,6 @@
 import { prisma } from '../../lib/prisma'
-import AddConsumableForm from '../../components/AddConsumableForm'
 import ConsumableTable from '../../components/ConsumableTable'
+import Link from 'next/link'
 
 export default async function ItemsPage() {
   const [consumables, locations] = await Promise.all([
@@ -11,10 +11,16 @@ export default async function ItemsPage() {
   return (
     <main className="min-h-screen bg-zinc-950 text-white p-8">
       <div className="mx-auto max-w-6xl">
-        <h1 className="text-3xl font-semibold">Consumables</h1>
-        <p className="mt-1 text-zinc-400">{consumables.length} total consumables</p>
-
-        <AddConsumableForm locations={locations} />
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-semibold">Consumables</h1>
+            <p className="mt-1 text-zinc-400">{consumables.length} total consumables</p>
+          </div>
+          <Link href="/items/new"
+            className="rounded-xl bg-white px-4 py-2 text-black font-medium hover:bg-zinc-200">
+            Add Consumable
+          </Link>
+        </div>
 
         <div className="mt-6">
           <ConsumableTable consumables={consumables} locations={locations} />

@@ -145,7 +145,7 @@ export async function addConsumable(prevState: any, formData: FormData) {
   })
 
   revalidatePath('/items')
-  return null
+  return { success: true }
 }
 
 export async function updateAssetNotes(id: number, notes: string) {

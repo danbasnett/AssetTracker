@@ -6,7 +6,7 @@ import { addConsumable } from '../app/actions'
 type Location = { id: number; name: string }
 
 export default function AddConsumableForm({ locations }: { locations: Location[] }) {
-  const [state, formAction] = useActionState(addConsumable, null)
+  const [, formAction] = useActionState(addConsumable, null)
   const [name, setName] = useState('')
   const [quantity, setQuantity] = useState('0')
   const [reorderPoint, setReorderPoint] = useState('5')
@@ -16,9 +16,7 @@ export default function AddConsumableForm({ locations }: { locations: Location[]
 
   return (
     <form action={formAction} className="mt-4 flex flex-col gap-3">
-      {state?.error && (
-        <p className="text-red-400 text-sm">{state.error}</p>
-      )}
+
       <div className="flex flex-wrap gap-3">
         <input name="name" placeholder="Item name" required value={name} onChange={e => setName(e.target.value)}
           className="rounded-xl bg-zinc-800 px-4 py-2 text-white placeholder-zinc-500 border border-zinc-700" />
