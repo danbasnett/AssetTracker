@@ -208,14 +208,17 @@ export async function uploadLogo(prevState: any, formData: FormData) {
   const filename = `logo.${ext}`
   const uploadDir = path.join(process.cwd(), 'public', 'uploads')
 
-  await fs.mkdir(uploadDir, { recursive: true })
+  try {
+    await fs.mkdir(uploadDir, { recursive: true })
 
-  // Remove any previously uploaded logo regardless of extension
-  for (const e of Object.values(ALLOWED_LOGO_TYPES)) {
-    try { await fs.unlink(path.join(uploadDir, `logo.${e}`)) } catch {}
+    for (const e of Object.values(ALLOWED_LOGO_TYPES)) {
+      try { await fs.unlink(path.join(uploadDir, `logo.${e}`)) } catch {}
+    }
+
+    await fs.writeFile(path.join(uploadDir, filename), Buffer.from(await file.arrayBuffer()))
+  } catch (e: any) {
+    return { error: `Failed to save file: ${e.message}` }
   }
-
-  await fs.writeFile(path.join(uploadDir, filename), Buffer.from(await file.arrayBuffer()))
 
   await prisma.setting.upsert({
     where: { key: 'logoPath' },

@@ -21,7 +21,10 @@ function runDailyCron(baseUrl) {
   const url = `${baseUrl}/api/cron`
   const opts = baseUrl.startsWith('https') ? { agent: allowSelfSigned } : {}
   fetch(url, opts)
-    .then(r => r.json())
+    .then(r => {
+      if (!r.ok) throw new Error(`HTTP ${r.status}`)
+      return r.json()
+    })
     .then(data => console.log(`[cron] Daily job complete:`, data))
     .catch(err => console.error(`[cron] Daily job failed:`, err))
 }
@@ -38,7 +41,7 @@ app.prepare().then(() => {
       .listen(port, '0.0.0.0', () => {
         baseUrl = `https://localhost:${port}`
         console.log(`> Server listening on https://0.0.0.0:${port}`)
-        runDailyCron(baseUrl)
+        setTimeout(() => runDailyCron(baseUrl), 5000)
         setInterval(() => runDailyCron(baseUrl), MS_PER_DAY)
       })
   } else {
@@ -46,7 +49,7 @@ app.prepare().then(() => {
       .listen(port, '0.0.0.0', () => {
         baseUrl = `http://localhost:${port}`
         console.log(`> Server listening on http://0.0.0.0:${port}`)
-        runDailyCron(baseUrl)
+        setTimeout(() => runDailyCron(baseUrl), 5000)
         setInterval(() => runDailyCron(baseUrl), MS_PER_DAY)
       })
   }
