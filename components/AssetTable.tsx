@@ -5,8 +5,14 @@ import { deleteAssets, updateAsset } from '../app/actions'
 import BulkEditBar from './BulkEditBar'
 import SearchBar from './SearchBar'
 import Link from 'next/link'
+import { SortIcon, sortRows, thCls, type SortDir } from './SortableHeader'
 
 type Location = {
+  id: number
+  name: string
+}
+
+type Status = {
   id: number
   name: string
 }
@@ -20,7 +26,7 @@ type Asset = {
   locationId?: number | null
 }
 
-export default function AssetTable({ assets, locations }: { assets: Asset[], locations: Location[] }) {
+export default function AssetTable({ assets, locations, statuses, canEdit }: { assets: Asset[], locations: Location[], statuses: Status[], canEdit: boolean }) {
   const [selected, setSelected] = useState<number[]>([])
   const [editingId, setEditingId] = useState<number | null>(null)
   const [editValues, setEditValues] = useState<Partial<Asset>>({})
@@ -28,10 +34,30 @@ export default function AssetTable({ assets, locations }: { assets: Asset[], loc
   const [deleteError, setDeleteError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
   const [search, setSearch] = useState('')
+  const [statusFilters, setStatusFilters] = useState<Set<string>>(new Set())
+  const [sortKey, setSortKey] = useState('name')
+  const [sortDir, setSortDir] = useState<SortDir>('asc')
 
-  const filtered = assets.filter(a =>
-    a.name.toLowerCase().includes(search.toLowerCase()) ||
-    a.assetTag.toLowerCase().includes(search.toLowerCase())
+  function toggleSort(key: string) {
+    if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    else { setSortKey(key); setSortDir('asc') }
+  }
+
+  function toggleStatusFilter(s: string) {
+    setStatusFilters(prev => {
+      const next = new Set(prev)
+      next.has(s) ? next.delete(s) : next.add(s)
+      return next
+    })
+  }
+
+  const filtered = sortRows(
+    assets.filter(a =>
+      (a.name.toLowerCase().includes(search.toLowerCase()) ||
+       a.assetTag.toLowerCase().includes(search.toLowerCase())) &&
+      (statusFilters.size === 0 || statusFilters.has(a.status))
+    ).map(a => ({ ...a, locationName: a.location?.name ?? '' })),
+    sortKey, sortDir
   )
 
   const activeSelected = selected.filter(id => assets.some(a => a.id === id)).length
@@ -105,9 +131,28 @@ export default function AssetTable({ assets, locations }: { assets: Asset[], loc
         <p className="text-red-400 text-sm mb-3">{deleteError || editError}</p>
       )}
 
+      {statuses.length > 0 && (
+        <div className="mb-3 flex gap-1 flex-wrap">
+          {statuses.map(s => (
+            <button key={s.id} type="button" onClick={() => toggleStatusFilter(s.name)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                statusFilters.has(s.name) ? 'bg-white text-black' : 'bg-zinc-800 text-zinc-400 hover:text-white'
+              }`}>
+              {s.name}
+            </button>
+          ))}
+          {statusFilters.size > 0 && (
+            <button type="button" onClick={() => setStatusFilters(new Set())}
+              className="px-3 py-1.5 rounded-lg text-xs font-medium bg-zinc-700 text-zinc-300 hover:text-white transition-colors">
+              Clear
+            </button>
+          )}
+        </div>
+      )}
+
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <SearchBar value={search} onChange={setSearch} />
-        {activeSelected > 0 && (
+        {canEdit && activeSelected > 0 && (
           <>
             <button type="button" onClick={handleDelete} disabled={isPending}
               className="rounded-xl bg-red-600 px-4 py-2 text-white font-medium disabled:opacity-50">
@@ -119,11 +164,14 @@ export default function AssetTable({ assets, locations }: { assets: Asset[], loc
             </button>
           </>
         )}
-        <BulkEditBar
-          selectedIds={selected}
-          locations={locations}
-          onSuccess={() => setSelected([])}
-        />
+        {canEdit && (
+          <BulkEditBar
+            selectedIds={selected}
+            locations={locations}
+            statuses={statuses}
+            onSuccess={() => setSelected([])}
+          />
+        )}
       </div>
 
       <div className="rounded-2xl border border-zinc-800 bg-zinc-900 overflow-x-auto">
@@ -133,27 +181,29 @@ export default function AssetTable({ assets, locations }: { assets: Asset[], loc
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-zinc-800 text-zinc-400">
-                <th className="p-4 text-left w-8"></th>
-                <th className="p-4 text-left">Name</th>
-                <th className="p-4 text-left">Tag</th>
-                <th className="p-4 text-left">Status</th>
-                <th className="p-4 text-left">Location</th>
-                <th className="p-4 text-left"></th>
+                {canEdit && <th className="p-4 text-left w-8"></th>}
+                <th className={thCls} onClick={() => toggleSort('name')}>Name <SortIcon active={sortKey==='name'} dir={sortDir} /></th>
+                <th className={thCls} onClick={() => toggleSort('assetTag')}>Tag <SortIcon active={sortKey==='assetTag'} dir={sortDir} /></th>
+                <th className={thCls} onClick={() => toggleSort('status')}>Status <SortIcon active={sortKey==='status'} dir={sortDir} /></th>
+                <th className={thCls} onClick={() => toggleSort('locationName')}>Location <SortIcon active={sortKey==='locationName'} dir={sortDir} /></th>
+                {canEdit && <th className="p-4 text-left"></th>}
               </tr>
             </thead>
             <tbody>
               {filtered.map(asset => (
                 <tr key={asset.id} className="border-b border-zinc-800 last:border-0">
-                  <td className="p-4">
-                    <input
-                      type="checkbox"
-                      checked={selected.includes(asset.id)}
-                      onChange={() => toggle(asset.id)}
-                      className="w-4 h-4 accent-white align-middle"
-                    />
-                  </td>
+                  {canEdit && (
+                    <td className="p-4">
+                      <input
+                        type="checkbox"
+                        checked={selected.includes(asset.id)}
+                        onChange={() => toggle(asset.id)}
+                        className="w-4 h-4 accent-white align-middle"
+                      />
+                    </td>
+                  )}
 
-                  {editingId === asset.id ? (
+                  {canEdit && editingId === asset.id ? (
                     <>
                       <td className="p-2">
                         <input
@@ -174,10 +224,9 @@ export default function AssetTable({ assets, locations }: { assets: Asset[], loc
                           value={editValues.status ?? ''}
                           onChange={e => setEditValues(v => ({ ...v, status: e.target.value }))}
                           className="rounded-lg bg-zinc-800 px-3 py-1 text-white border border-zinc-700">
-                          <option value="available">Available</option>
-                          <option value="checked_out">Checked Out</option>
-                          <option value="repair">Repair</option>
-                          <option value="retired">Retired</option>
+                          {statuses.map(s => (
+                            <option key={s.id} value={s.name}>{s.name}</option>
+                          ))}
                         </select>
                       </td>
                       <td className="p-2">
@@ -217,14 +266,16 @@ export default function AssetTable({ assets, locations }: { assets: Asset[], loc
                       <td className="p-4 text-zinc-400">{asset.assetTag}</td>
                       <td className="p-4">{asset.status}</td>
                       <td className="p-4 text-zinc-400">{asset.location?.name ?? '—'}</td>
-                      <td className="p-4">
-                        <button
-                          type="button"
-                          onClick={() => startEdit(asset)}
-                          className="rounded-lg bg-zinc-700 px-3 py-1 text-white text-xs hover:bg-zinc-600">
-                          Edit
-                        </button>
-                      </td>
+                      {canEdit && (
+                        <td className="p-4">
+                          <button
+                            type="button"
+                            onClick={() => startEdit(asset)}
+                            className="rounded-lg bg-zinc-700 px-3 py-1 text-white text-xs hover:bg-zinc-600">
+                            Edit
+                          </button>
+                        </td>
+                      )}
                     </>
                   )}
                 </tr>

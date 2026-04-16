@@ -4,6 +4,8 @@ import { Geist, Geist_Mono } from "next/font/google"
 import "./globals.css"
 import { SidebarProvider } from '../components/SidebarContext'
 import LayoutWrapper from '../components/LayoutWrapper'
+import { getSession } from '../lib/session'
+import { prisma } from '../lib/prisma'
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -20,22 +22,41 @@ export const metadata: Metadata = {
   description: "Asset management system",
 }
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode
 }>) {
+  const session = await getSession()
+
+  const [logoSetting, currentUser] = session.isLoggedIn
+    ? await Promise.all([
+        prisma.setting.findUnique({ where: { key: 'logoPath' } }).catch(() => null),
+        prisma.user.findUnique({ where: { id: session.userId }, select: { avatarPath: true } }).catch(() => null),
+      ])
+    : [null, null]
+  const userRole = session.isLoggedIn ? session.role : null
+
   return (
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        <SidebarProvider>
-          <div className="flex">
-            <Sidebar />
-            <LayoutWrapper>
-              {children}
-            </LayoutWrapper>
-          </div>
-        </SidebarProvider>
+        {session.isLoggedIn ? (
+          <SidebarProvider>
+            <div className="flex">
+              <Sidebar
+                logoUrl={logoSetting?.value ?? undefined}
+                userRole={userRole ?? 'VIEW_ONLY'}
+                username={session.username}
+                avatarUrl={currentUser?.avatarPath ?? undefined}
+              />
+              <LayoutWrapper>
+                {children}
+              </LayoutWrapper>
+            </div>
+          </SidebarProvider>
+        ) : (
+          children
+        )}
       </body>
     </html>
   )

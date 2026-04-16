@@ -1,0 +1,7 @@
+CREATE TABLE "User" (
+  "id" SERIAL PRIMARY KEY,
+  "username" TEXT UNIQUE NOT NULL,
+  "passwordHash" TEXT NOT NULL,
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "lastLoginAt" TIMESTAMP(3)
+);

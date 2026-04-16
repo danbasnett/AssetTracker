@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from 'react'
 import { deleteLocations } from '../app/actions'
+import { SortIcon, sortRows, thCls, type SortDir } from './SortableHeader'
 
 type Location = {
   id: number
@@ -10,9 +11,21 @@ type Location = {
   parent: { name: string } | null
 }
 
-export default function LocationTable({ locations }: { locations: Location[] }) {
+export default function LocationTable({ locations, canEdit }: { locations: Location[], canEdit: boolean }) {
   const [state, formAction] = useActionState(deleteLocations, null)
   const [selected, setSelected] = useState<number[]>([])
+  const [sortKey, setSortKey] = useState('name')
+  const [sortDir, setSortDir] = useState<SortDir>('asc')
+
+  function toggleSort(key: string) {
+    if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
+    else { setSortKey(key); setSortDir('asc') }
+  }
+
+  const sorted = sortRows(
+    locations.map(l => ({ ...l, parentName: l.parent?.name ?? '' })),
+    sortKey, sortDir
+  )
 
   function toggle(id: number) {
     setSelected(prev =>
@@ -38,7 +51,7 @@ export default function LocationTable({ locations }: { locations: Location[] }) 
         <p className="text-red-400 text-sm mb-3">{state.error}</p>
       )}
 
-      {selected.filter(id => locations.some(l => l.id === id)).length > 0 && (
+      {canEdit && selected.filter(id => locations.some(l => l.id === id)).length > 0 && (
         <div className="mb-3">
           <button type="submit"
             className="rounded-xl bg-red-600 px-4 py-2 text-white font-medium">
@@ -58,22 +71,24 @@ export default function LocationTable({ locations }: { locations: Location[] }) 
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-zinc-800 text-zinc-400">
-                <th className="p-4 text-left w-8"></th>
-                <th className="p-4 text-left">Name</th>
-                <th className="p-4 text-left">Parent</th>
+                {canEdit && <th className="p-4 text-left w-8"></th>}
+                <th className={thCls} onClick={() => toggleSort('name')}>Name <SortIcon active={sortKey==='name'} dir={sortDir} /></th>
+                <th className={thCls} onClick={() => toggleSort('parentName')}>Parent <SortIcon active={sortKey==='parentName'} dir={sortDir} /></th>
               </tr>
             </thead>
             <tbody>
-              {locations.map(location => (
+              {sorted.map(location => (
                 <tr key={location.id} className="border-b border-zinc-800 last:border-0">
-                  <td className="p-4">
-                    <input
-                      type="checkbox"
-                      checked={selected.includes(location.id)}
-                      onChange={() => toggle(location.id)}
-                      className="w-4 h-4 accent-white align-middle"
-                    />
-                  </td>
+                  {canEdit && (
+                    <td className="p-4">
+                      <input
+                        type="checkbox"
+                        checked={selected.includes(location.id)}
+                        onChange={() => toggle(location.id)}
+                        className="w-4 h-4 accent-white align-middle"
+                      />
+                    </td>
+                  )}
                   <td className="p-4">{location.name}</td>
                   <td className="p-4 text-zinc-400">{location.parent?.name ?? '—'}</td>
                 </tr>

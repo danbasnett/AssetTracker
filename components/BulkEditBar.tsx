@@ -8,9 +8,15 @@ type Location = {
   name: string
 }
 
-export default function BulkEditBar({ selectedIds, locations, onSuccess }: {
+type Status = {
+  id: number
+  name: string
+}
+
+export default function BulkEditBar({ selectedIds, locations, statuses, onSuccess }: {
   selectedIds: number[]
   locations: Location[]
+  statuses: Status[]
   onSuccess: () => void
 }) {
   const [state, formAction] = useActionState(bulkUpdateAssets, null)
@@ -26,10 +32,9 @@ export default function BulkEditBar({ selectedIds, locations, onSuccess }: {
       <select name="status" defaultValue=""
         className="rounded-xl bg-zinc-800 px-3 py-2 text-white border border-zinc-700 text-sm">
         <option value="">— status —</option>
-        <option value="available">Available</option>
-        <option value="checked_out">Checked Out</option>
-        <option value="repair">Repair</option>
-        <option value="retired">Retired</option>
+        {statuses.map(s => (
+          <option key={s.id} value={s.name}>{s.name}</option>
+        ))}
       </select>
 
       <select name="locationId" defaultValue=""

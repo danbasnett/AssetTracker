@@ -1,4 +1,5 @@
 import { prisma } from '../../../lib/prisma'
+import { requireAuth, hasRole } from '../../../lib/session'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import NoteEditor from '../../../components/NoteEditor'
@@ -7,6 +8,8 @@ import { updateConsumableNotes } from '../../actions'
 
 export default async function ConsumableDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
+  const session = await requireAuth()
+  const canEdit = hasRole(session.role, 'ASSET_CONTROL')
 
   const [item, locations] = await Promise.all([
     prisma.consumable.findUnique({ where: { id: parseInt(id) }, include: { location: true } }),
@@ -29,10 +32,11 @@ export default async function ConsumableDetailPage({ params }: { params: Promise
         {isEmpty && <p className="mt-1 text-red-400 text-sm">Out of stock</p>}
         {isLow && <p className="mt-1 text-yellow-400 text-sm">Low stock</p>}
 
-        <ConsumableDetailEditor item={item} locations={locations} />
+        <ConsumableDetailEditor item={item} locations={locations} canEdit={canEdit} />
 
         <NoteEditor
           initialNotes={item.notes}
+          canEdit={canEdit}
           onSave={async (notes) => {
             'use server'
             await updateConsumableNotes(item.id, notes)

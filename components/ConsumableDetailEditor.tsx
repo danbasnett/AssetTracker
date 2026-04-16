@@ -17,7 +17,7 @@ type Consumable = {
   createdAt: Date
 }
 
-export default function ConsumableDetailEditor({ item, locations }: { item: Consumable; locations: Location[] }) {
+export default function ConsumableDetailEditor({ item, locations, canEdit }: { item: Consumable; locations: Location[]; canEdit: boolean }) {
   const [editing, setEditing] = useState(false)
   const [values, setValues] = useState({
     name: item.name,
@@ -55,10 +55,12 @@ export default function ConsumableDetailEditor({ item, locations }: { item: Cons
       <div className="flex justify-between items-center mb-3">
         <span className="text-sm text-zinc-400">Details</span>
         {!editing ? (
-          <button onClick={() => setEditing(true)}
-            className="rounded-lg bg-zinc-700 px-3 py-1 text-white text-xs hover:bg-zinc-600">
-            Edit
-          </button>
+          canEdit && (
+            <button onClick={() => setEditing(true)}
+              className="rounded-lg bg-zinc-700 px-3 py-1 text-white text-xs hover:bg-zinc-600">
+              Edit
+            </button>
+          )
         ) : (
           <div className="flex gap-2">
             <button onClick={save} disabled={isPending}

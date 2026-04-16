@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useTransition } from 'react'
-import { updateAsset } from '../app/actions'
+import { useState, useTransition, useActionState } from 'react'
+import { updateAsset, reportProblem } from '../app/actions'
 
 type Location = { id: number; name: string }
+type Status = { id: number; name: string }
 
 type Asset = {
   id: number
@@ -20,15 +21,10 @@ type Asset = {
   createdAt: Date
 }
 
-const statusLabels: Record<string, string> = {
-  available: 'Available',
-  checked_out: 'Checked Out',
-  repair: 'Repair',
-  retired: 'Retired',
-}
-
-export default function AssetDetailEditor({ asset, locations }: { asset: Asset; locations: Location[] }) {
+export default function AssetDetailEditor({ asset, locations, statuses, canEdit }: { asset: Asset; locations: Location[]; statuses: Status[]; canEdit: boolean }) {
   const [editing, setEditing] = useState(false)
+  const [showReportForm, setShowReportForm] = useState(false)
+  const [reportState, reportAction] = useActionState(reportProblem, null)
   const [values, setValues] = useState({
     name: asset.name,
     assetTag: asset.assetTag,
@@ -71,24 +67,53 @@ export default function AssetDetailEditor({ asset, locations }: { asset: Asset; 
     <div className="mt-8">
       <div className="flex justify-between items-center mb-3">
         <span className="text-sm text-zinc-400">Details</span>
-        {!editing ? (
-          <button onClick={() => setEditing(true)}
-            className="rounded-lg bg-zinc-700 px-3 py-1 text-white text-xs hover:bg-zinc-600">
-            Edit
+        <div className="flex gap-2 items-center">
+          <button
+            type="button"
+            onClick={() => { setShowReportForm(f => !f); setEditing(false) }}
+            className="rounded-lg bg-red-950 border border-red-800 px-3 py-1 text-red-300 text-xs font-medium hover:bg-red-900 transition-colors">
+            {showReportForm ? 'Cancel' : '⚠ Report Problem'}
           </button>
-        ) : (
-          <div className="flex gap-2">
-            <button onClick={save} disabled={isPending}
-              className="rounded-lg bg-white px-3 py-1 text-black text-xs font-medium disabled:opacity-50">
-              Save
-            </button>
-            <button onClick={() => { setEditing(false); setError(null) }}
-              className="rounded-lg bg-zinc-700 px-3 py-1 text-white text-xs">
-              Cancel
-            </button>
-          </div>
-        )}
+          {!editing ? (
+            canEdit && (
+              <button onClick={() => { setEditing(true); setShowReportForm(false) }}
+                className="rounded-lg bg-zinc-700 px-3 py-1 text-white text-xs hover:bg-zinc-600">
+                Edit
+              </button>
+            )
+          ) : (
+            <>
+              <button onClick={save} disabled={isPending}
+                className="rounded-lg bg-white px-3 py-1 text-black text-xs font-medium disabled:opacity-50">
+                Save
+              </button>
+              <button onClick={() => { setEditing(false); setError(null) }}
+                className="rounded-lg bg-zinc-700 px-3 py-1 text-white text-xs">
+                Cancel
+              </button>
+            </>
+          )}
+        </div>
       </div>
+
+      {showReportForm && (
+        <form
+          action={async (fd) => { await reportAction(fd); setShowReportForm(false) }}
+          className="rounded-2xl border border-red-900 bg-red-950/30 p-4 space-y-3 mb-4">
+          <input type="hidden" name="assetId" value={asset.id} />
+          <label className="text-xs text-zinc-400 block">Describe the problem (optional)</label>
+          <input
+            name="description"
+            placeholder="e.g. Screen cracked, won't power on…"
+            className="w-full rounded-xl bg-zinc-800 px-3 py-2 text-white text-sm placeholder-zinc-500 border border-zinc-700 focus:outline-none focus:border-zinc-500"
+          />
+          <button type="submit"
+            className="rounded-xl bg-red-800 px-4 py-2 text-white text-sm font-medium hover:bg-red-700">
+            Submit Report
+          </button>
+          {(reportState as any)?.error && <p className="text-red-400 text-sm">{(reportState as any).error}</p>}
+        </form>
+      )}
 
       {error && <p className="text-red-400 text-sm mb-3">{error}</p>}
 
@@ -151,11 +176,11 @@ export default function AssetDetailEditor({ asset, locations }: { asset: Asset; 
           {editing ? (
             <select value={values.status} onChange={e => setValues(v => ({ ...v, status: e.target.value }))}
               className="rounded-lg bg-zinc-800 px-3 py-1 text-white border border-zinc-700 text-sm">
-              {Object.entries(statusLabels).map(([val, label]) => (
-                <option key={val} value={val}>{label}</option>
+              {statuses.map(s => (
+                <option key={s.id} value={s.name}>{s.name}</option>
               ))}
             </select>
-          ) : <span>{statusLabels[asset.status] ?? asset.status}</span>}
+          ) : <span>{asset.status}</span>}
         </div>
         <div className="flex justify-between items-center px-6 py-4">
           <span className="text-zinc-400">Location</span>

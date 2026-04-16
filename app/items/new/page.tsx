@@ -1,8 +1,10 @@
 import { prisma } from '../../../lib/prisma'
+import { requireRole } from '../../../lib/session'
 import Link from 'next/link'
 import NewConsumableForm from '../../../components/NewConsumableForm'
 
 export default async function NewConsumablePage() {
+  await requireRole('ASSET_CONTROL')
   const locations = await prisma.location.findMany({ orderBy: { name: 'asc' } })
 
   return (

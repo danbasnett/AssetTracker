@@ -18,30 +18,106 @@ model Location {
 }
 
 model Asset {
-  id           Int       @id @default(autoincrement())
+  id           Int           @id @default(autoincrement())
   name         String
-  assetTag     String    @unique
-  status       String    @default("available")
+  assetTag     String        @unique
+  status       String        @default("available")
   locationId   Int?
-  location     Location? @relation(fields: [locationId], references: [id])
+  location     Location?     @relation(fields: [locationId], references: [id])
+  assigneeId   Int?
+  assignee     Person?       @relation(fields: [assigneeId], references: [id], onDelete: SetNull)
   serialNumber String?
   modelNumber  String?
   supplier     String?
   purchaseDate DateTime?
   value        Float?
   notes        String?
-  createdAt    DateTime  @default(now())
+  createdAt    DateTime      @default(now())
+  allocations  Allocation[]  @relation("AllocationAssets")
+  maintenance  Maintenance[]
+}
+
+model Person {
+  id         Int      @id @default(autoincrement())
+  name       String
+  email      String?
+  department String?
+  createdAt  DateTime @default(now())
+  assets     Asset[]
+}
+
+enum MaintenanceStatus {
+  PENDING
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+model Maintenance {
+  id                   Int               @id @default(autoincrement())
+  assetId              Int
+  asset                Asset             @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  title                String
+  description          String?
+  status               MaintenanceStatus @default(SCHEDULED)
+  scheduledDate        DateTime?
+  completedDate        DateTime?
+  cost                 Float?
+  repeatIntervalDays   Int?
+  repeatEndDate        DateTime?
+  parentId             Int?
+  parent               Maintenance?      @relation("MaintenanceChain", fields: [parentId], references: [id], onDelete: SetNull)
+  children             Maintenance[]     @relation("MaintenanceChain")
+  createdAt            DateTime          @default(now())
+}
+
+model Allocation {
+  id         Int       @id @default(autoincrement())
+  name       String
+  startDate  DateTime
+  endDate    DateTime?
+  indefinite Boolean   @default(false)
+  createdAt  DateTime  @default(now())
+  assets     Asset[]   @relation("AllocationAssets")
 }
 
 model Consumable {
-  id             Int       @id @default(autoincrement())
-  name           String
-  quantity       Int       @default(0)
-  reorderPoint   Int       @default(5)
-  unit           String    @default("each")
-  modelNumber    String?
-  notes          String?
-  locationId     Int?
-  location       Location? @relation(fields: [locationId], references: [id])
-  createdAt      DateTime  @default(now())
+  id           Int       @id @default(autoincrement())
+  name         String
+  quantity     Int       @default(0)
+  reorderPoint Int       @default(5)
+  unit         String    @default("each")
+  modelNumber  String?
+  notes        String?
+  locationId   Int?
+  location     Location? @relation(fields: [locationId], references: [id])
+  createdAt    DateTime  @default(now())
+}
+
+model Status {
+  id   Int    @id @default(autoincrement())
+  name String @unique
+}
+
+enum Role {
+  VIEW_ONLY
+  ASSET_CONTROL
+  MANAGEMENT
+  ADMIN
+}
+
+model User {
+  id           Int       @id @default(autoincrement())
+  username     String    @unique
+  passwordHash String
+  role         Role      @default(ADMIN)
+  avatarPath   String?
+  createdAt    DateTime  @default(now())
+  lastLoginAt  DateTime?
+}
+
+model Setting {
+  key   String @id
+  value String
 }

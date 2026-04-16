@@ -5,8 +5,9 @@ import { useRouter } from 'next/navigation'
 import { addAsset } from '../app/actions'
 
 type Location = { id: number; name: string }
+type Status = { id: number; name: string }
 
-export default function NewAssetForm({ locations }: { locations: Location[] }) {
+export default function NewAssetForm({ locations, statuses }: { locations: Location[]; statuses: Status[] }) {
   const [state, formAction] = useActionState(addAsset, null)
   const router = useRouter()
 
@@ -35,12 +36,11 @@ export default function NewAssetForm({ locations }: { locations: Location[] }) {
           </div>
           <div className="flex items-center px-6 py-4 gap-4">
             <label className="text-zinc-400 w-36 shrink-0">Status</label>
-            <select name="status" defaultValue="available"
+            <select name="status" defaultValue={statuses[0]?.name ?? ''}
               className="flex-1 rounded-lg bg-zinc-800 px-3 py-2 text-white border border-zinc-700 focus:outline-none focus:border-zinc-500">
-              <option value="available">Available</option>
-              <option value="checked_out">Checked Out</option>
-              <option value="repair">Repair</option>
-              <option value="retired">Retired</option>
+              {statuses.map(s => (
+                <option key={s.id} value={s.name}>{s.name}</option>
+              ))}
             </select>
           </div>
           <div className="flex items-center px-6 py-4 gap-4">

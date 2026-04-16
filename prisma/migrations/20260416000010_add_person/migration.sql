@@ -1,0 +1,12 @@
+CREATE TABLE "Person" (
+  "id" SERIAL PRIMARY KEY,
+  "name" TEXT NOT NULL,
+  "email" TEXT,
+  "department" TEXT,
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+ALTER TABLE "Asset" ADD COLUMN "assigneeId" INTEGER;
+ALTER TABLE "Asset" ADD CONSTRAINT "Asset_assigneeId_fkey"
+  FOREIGN KEY ("assigneeId") REFERENCES "Person"("id")
+  ON DELETE SET NULL ON UPDATE CASCADE;
