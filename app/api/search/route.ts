@@ -48,7 +48,7 @@ export async function GET(req: Request) {
     results: [
       { type: 'Assets', items: assets.map(a => ({ id: a.id, title: a.name, sub: a.assetTag, badge: a.status, href: `/assets/${a.id}` })) },
       { type: 'People', items: people.map(p => ({ id: p.id, title: p.name, sub: p.department ?? undefined, href: `/people/${p.id}` })) },
-      { type: 'Locations', items: locations.map(l => ({ id: l.id, title: l.name, sub: l.address ?? undefined, href: `/locations/${l.id}` })) },
+      { type: 'Locations', items: locations.map((l: any) => ({ id: l.id, title: l.name, sub: l.address ?? undefined, href: `/locations/${l.id}` })) },
       { type: 'Consumables', items: consumables.map(c => ({ id: c.id, title: c.name, sub: `${c.quantity} ${c.unit}`, href: `/items/${c.id}` })) },
       { type: 'Maintenance', items: maintenance.map(m => ({ id: m.id, title: m.title, sub: (m as any).asset?.name, badge: m.status, href: `/maintenance` })) },
       { type: 'Allocations', items: allocations.map(a => ({ id: a.id, title: a.name, href: `/allocations/${a.id}` })) },
