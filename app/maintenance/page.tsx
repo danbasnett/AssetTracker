@@ -23,7 +23,7 @@ export default async function MaintenancePage() {
   ])
 
   return (
-    <main className="min-h-screen bg-zinc-950 text-white p-8">
+    <main className="min-h-screen bg-zinc-950 text-white p-4 md:p-8">
       <div className="mx-auto max-w-6xl">
         <h1 className="text-3xl font-semibold">Maintenance</h1>
         <p className="mt-1 text-zinc-400">{records.length} total records</p>

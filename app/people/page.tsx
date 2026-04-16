@@ -13,7 +13,7 @@ export default async function PeoplePage() {
   })
 
   return (
-    <main className="min-h-screen bg-zinc-950 text-white p-8">
+    <main className="min-h-screen bg-zinc-950 text-white p-4 md:p-8">
       <div className="mx-auto max-w-4xl">
         <h1 className="text-3xl font-semibold">People</h1>
         <p className="mt-1 text-zinc-400">{people.length} total people</p>

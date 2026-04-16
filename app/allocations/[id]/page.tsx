@@ -20,7 +20,7 @@ export default async function AllocationDetailPage({ params }: { params: Promise
   if (!allocation) notFound()
 
   return (
-    <main className="min-h-screen bg-zinc-950 text-white p-8">
+    <main className="min-h-screen bg-zinc-950 text-white p-4 md:p-8">
       <div className="mx-auto max-w-2xl">
         <Link href="/allocations" className="text-zinc-400 hover:text-white text-sm">
           ← Back to Allocations

@@ -29,7 +29,7 @@ export default async function AssetDetailPage({ params }: { params: Promise<{ id
   if (!asset) notFound()
 
   return (
-    <main className="min-h-screen bg-zinc-950 text-white p-8">
+    <main className="min-h-screen bg-zinc-950 text-white p-4 md:p-8">
       <div className="mx-auto max-w-3xl">
         <Link href="/assets" className="text-zinc-400 hover:text-white text-sm">
           ← Back to Assets

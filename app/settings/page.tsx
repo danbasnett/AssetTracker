@@ -14,7 +14,7 @@ export default async function SettingsPage() {
   ])
 
   return (
-    <main className="min-h-screen bg-zinc-950 text-white p-8">
+    <main className="min-h-screen bg-zinc-950 text-white p-4 md:p-8">
       <div className="mx-auto max-w-2xl">
         <h1 className="text-3xl font-semibold">Settings</h1>
         <p className="mt-1 text-zinc-400">Configure your asset tracker</p>

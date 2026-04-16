@@ -32,7 +32,7 @@ export default async function HomePage() {
   const completed   = mCount('COMPLETED')
 
   return (
-    <main className="min-h-screen bg-zinc-950 text-white p-8">
+    <main className="min-h-screen bg-zinc-950 text-white p-4 md:p-8">
       <div className="mx-auto max-w-6xl">
         <h1 className="text-3xl font-semibold">Dashboard</h1>
         <p className="mt-1 text-zinc-400">Overview of your assets</p>

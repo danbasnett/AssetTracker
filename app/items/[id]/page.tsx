@@ -22,7 +22,7 @@ export default async function ConsumableDetailPage({ params }: { params: Promise
   const isEmpty = item.quantity === 0
 
   return (
-    <main className="min-h-screen bg-zinc-950 text-white p-8">
+    <main className="min-h-screen bg-zinc-950 text-white p-4 md:p-8">
       <div className="mx-auto max-w-2xl">
         <Link href="/items" className="text-zinc-400 hover:text-white text-sm">
           ← Back to Consumables

@@ -90,22 +90,24 @@ export default function Sidebar({ logoUrl, userRole, username, avatarUrl }: { lo
       </div>
 
       {/* Mobile bottom nav */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-zinc-900 border-t border-zinc-800 flex justify-around p-3 z-50">
-        {[...links, ...(userRole === 'ADMIN' ? [{ href: '/settings', label: 'Settings', icon: Settings }] : [])].map(link => {
-          const Icon = link.icon
-          return (
-            <Link
-              key={link.href}
-              href={link.href}
-              className={`flex flex-col items-center gap-1 px-4 py-1 rounded-lg text-xs ${
-                pathname === link.href ? 'text-white' : 'text-zinc-400'
-              }`}
-            >
-              <Icon size={22} />
-              <span>{link.label}</span>
-            </Link>
-          )
-        })}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-zinc-900 border-t border-zinc-800 z-50">
+        <div className="flex overflow-x-auto scrollbar-none px-1 py-2">
+          {[...links, ...(userRole === 'ADMIN' ? [{ href: '/settings', label: 'Settings', icon: Settings }] : [])].map(link => {
+            const Icon = link.icon
+            return (
+              <Link
+                key={link.href}
+                href={link.href}
+                className={`flex flex-col items-center gap-0.5 px-3 py-1 rounded-lg shrink-0 ${
+                  pathname === link.href ? 'text-white' : 'text-zinc-400'
+                }`}
+              >
+                <Icon size={20} />
+                <span className="text-[10px] leading-tight">{link.label}</span>
+              </Link>
+            )
+          })}
+        </div>
       </div>
     </>
   )
