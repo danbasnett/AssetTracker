@@ -107,6 +107,13 @@ export default function Sidebar({ logoUrl, userRole, username, avatarUrl }: { lo
               </Link>
             )
           })}
+          <button
+            onClick={handleLogout}
+            className="flex flex-col items-center gap-0.5 px-3 py-1 rounded-lg shrink-0 text-zinc-400"
+          >
+            <LogOut size={20} />
+            <span className="text-[10px] leading-tight">Sign out</span>
+          </button>
         </div>
       </div>
     </>

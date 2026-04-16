@@ -219,8 +219,8 @@ export async function uploadLogo(prevState: any, formData: FormData) {
 
   await prisma.setting.upsert({
     where: { key: 'logoPath' },
-    update: { value: `/uploads/${filename}` },
-    create: { key: 'logoPath', value: `/uploads/${filename}` },
+    update: { value: `/uploads/${filename}?t=${Date.now()}` },
+    create: { key: 'logoPath', value: `/uploads/${filename}?t=${Date.now()}` },
   })
 
   revalidatePath('/', 'layout')

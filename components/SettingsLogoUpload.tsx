@@ -1,13 +1,17 @@
 'use client'
 
-import { useActionState, useTransition, useState } from 'react'
+import { useActionState, useTransition, useState, useEffect } from 'react'
 import { uploadLogo, removeLogo } from '../app/actions'
-import Image from 'next/image'
 
 export default function SettingsLogoUpload({ currentLogoUrl }: { currentLogoUrl?: string }) {
   const [state, formAction] = useActionState(uploadLogo, null)
   const [preview, setPreview] = useState<string | null>(null)
   const [, startTransition] = useTransition()
+
+  // Clear local preview once upload succeeds so the re-fetched URL (with new timestamp) shows
+  useEffect(() => {
+    if (state?.success) setPreview(null)
+  }, [state])
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
