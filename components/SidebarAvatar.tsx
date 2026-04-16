@@ -1,6 +1,6 @@
 'use client'
 
-import { useTransition, useRef } from 'react'
+import { useTransition, useRef, useState } from 'react'
 import { uploadAvatar } from '../app/actions'
 
 export default function SidebarAvatar({
@@ -13,6 +13,8 @@ export default function SidebarAvatar({
   collapsed: boolean
 }) {
   const [isPending, startTransition] = useTransition()
+  const [localAvatarUrl, setLocalAvatarUrl] = useState(avatarUrl)
+  const [error, setError] = useState<string | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -20,8 +22,18 @@ export default function SidebarAvatar({
     if (!file) return
     const formData = new FormData()
     formData.append('avatar', file)
+    setError(null)
     startTransition(async () => {
-      await uploadAvatar(null, formData)
+      const result = await uploadAvatar(null, formData)
+      if ((result as any)?.error) {
+        setError((result as any).error)
+      } else if ((result as any)?.success) {
+        // Force browser to reload the image by appending a timestamp
+        setLocalAvatarUrl(prev => {
+          const base = (prev ?? avatarUrl ?? '').split('?')[0]
+          return base ? `${base}?t=${Date.now()}` : undefined
+        })
+      }
     })
     e.target.value = ''
   }
@@ -33,30 +45,35 @@ export default function SidebarAvatar({
   }`
 
   return (
-    <div className="flex items-center px-3 py-2 mb-1">
-      <button
-        type="button"
-        onClick={() => inputRef.current?.click()}
-        disabled={isPending}
-        title="Change profile picture"
-        className="relative shrink-0 rounded-full focus:outline-none group disabled:opacity-50"
-      >
-        <div className="w-8 h-8 rounded-full bg-zinc-700 overflow-hidden flex items-center justify-center ring-2 ring-transparent group-hover:ring-zinc-500 transition-all">
-          {avatarUrl ? (
-            <img src={avatarUrl} alt={username} className="w-full h-full object-cover" />
-          ) : (
-            <span className="text-sm font-semibold text-white">{initial}</span>
-          )}
-        </div>
-        <input
-          ref={inputRef}
-          type="file"
-          accept="image/png,image/jpeg,image/webp,image/gif"
-          onChange={handleFileChange}
-          className="sr-only"
-        />
-      </button>
-      <span className={`text-sm text-zinc-300 ${LABEL_CLASS}`}>{username}</span>
+    <div className="px-3 py-2 mb-1">
+      <div className="flex items-center">
+        <button
+          type="button"
+          onClick={() => inputRef.current?.click()}
+          disabled={isPending}
+          title="Change profile picture"
+          className="relative shrink-0 rounded-full focus:outline-none group disabled:opacity-50"
+        >
+          <div className="w-8 h-8 rounded-full bg-zinc-700 overflow-hidden flex items-center justify-center ring-2 ring-transparent group-hover:ring-zinc-500 transition-all">
+            {localAvatarUrl ? (
+              <img src={localAvatarUrl} alt={username} className="w-full h-full object-cover" />
+            ) : (
+              <span className="text-sm font-semibold text-white">{initial}</span>
+            )}
+          </div>
+          <input
+            ref={inputRef}
+            type="file"
+            accept="image/png,image/jpeg,image/webp,image/gif"
+            onChange={handleFileChange}
+            className="sr-only"
+          />
+        </button>
+        <span className={`text-sm text-zinc-300 ${LABEL_CLASS}`}>{username}</span>
+      </div>
+      {error && !collapsed && (
+        <p className="mt-1 text-xs text-red-400 pl-1">{error}</p>
+      )}
     </div>
   )
 }
