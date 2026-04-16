@@ -811,3 +811,18 @@ export async function reportProblem(prevState: any, formData: FormData) {
   revalidatePath('/maintenance')
   return { success: true }
 }
+
+export async function deleteAllData() {
+  const session = await requireAuth()
+  if (!hasRole(session.role, 'ADMIN')) return { error: 'Insufficient permissions' }
+
+  await prisma.maintenance.deleteMany()
+  await prisma.allocation.deleteMany()
+  await prisma.asset.deleteMany()
+  await prisma.consumable.deleteMany()
+  await prisma.person.deleteMany()
+  await prisma.location.deleteMany()
+
+  revalidatePath('/', 'layout')
+  return { success: true }
+}

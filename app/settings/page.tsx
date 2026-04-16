@@ -3,6 +3,7 @@ import { requireRole } from '../../lib/session'
 import SettingsStatusList from '../../components/SettingsStatusList'
 import SettingsUserList from '../../components/SettingsUserList'
 import SettingsLogoUpload from '../../components/SettingsLogoUpload'
+import SettingsDeleteAll from '../../components/SettingsDeleteAll'
 
 export default async function SettingsPage() {
   const session = await requireRole('ADMIN')
@@ -32,6 +33,11 @@ export default async function SettingsPage() {
         <div className="mt-10">
           <h2 className="text-sm font-medium text-zinc-400 uppercase tracking-wider mb-3">Users</h2>
           <SettingsUserList users={users} currentUserId={session.userId} />
+        </div>
+
+        <div className="mt-10">
+          <h2 className="text-sm font-medium text-zinc-400 uppercase tracking-wider mb-3">Danger Zone</h2>
+          <SettingsDeleteAll />
         </div>
       </div>
     </main>

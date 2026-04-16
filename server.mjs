@@ -41,7 +41,6 @@ app.prepare().then(() => {
       .listen(port, '0.0.0.0', () => {
         baseUrl = `https://localhost:${port}`
         console.log(`> Server listening on https://0.0.0.0:${port}`)
-        setTimeout(() => runDailyCron(baseUrl), 5000)
         setInterval(() => runDailyCron(baseUrl), MS_PER_DAY)
       })
   } else {
@@ -49,7 +48,6 @@ app.prepare().then(() => {
       .listen(port, '0.0.0.0', () => {
         baseUrl = `http://localhost:${port}`
         console.log(`> Server listening on http://0.0.0.0:${port}`)
-        setTimeout(() => runDailyCron(baseUrl), 5000)
         setInterval(() => runDailyCron(baseUrl), MS_PER_DAY)
       })
   }
