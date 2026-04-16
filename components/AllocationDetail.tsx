@@ -1,6 +1,6 @@
 'use client'
 
-import { useActionState, useTransition } from 'react'
+import { useState, useTransition, useRef, useEffect } from 'react'
 import { addAssetToAllocation, removeAssetFromAllocation } from '../app/actions'
 import Link from 'next/link'
 
@@ -23,17 +23,62 @@ type Asset = {
   assetTag: string
 }
 
+type Mode = 'assign' | 'deassign'
+
 export default function AllocationDetail({ allocation, allAssets, canManage }: { allocation: Allocation; allAssets: Asset[]; canManage: boolean }) {
+  const [mode, setMode] = useState<Mode>('assign')
+  const [query, setQuery] = useState('')
+  const [showSuggestions, setShowSuggestions] = useState(false)
+  const [activeIndex, setActiveIndex] = useState(0)
+  const [error, setError] = useState<string | null>(null)
+  const [isPending, startTransition] = useTransition()
+  const inputRef = useRef<HTMLInputElement>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
+
   const allocatedIds = new Set(allocation.assets.map(a => a.id))
   const available = allAssets.filter(a => !allocatedIds.has(a.id))
 
-  const [addState, addAction] = useActionState(addAssetToAllocation, null)
-  const [, startTransition] = useTransition()
+  const suggestions = (mode === 'assign' ? available : allAssets.filter(a => allocatedIds.has(a.id)))
+    .filter(a =>
+      !query ||
+      a.name.toLowerCase().includes(query.toLowerCase()) ||
+      a.assetTag.toLowerCase().includes(query.toLowerCase())
+    )
+    .slice(0, 8)
 
-  function handleRemove(assetId: number) {
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) setShowSuggestions(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  function handleKeyDown(e: React.KeyboardEvent) {
+    if (!showSuggestions || suggestions.length === 0) return
+    if (e.key === 'ArrowDown') { e.preventDefault(); setActiveIndex(i => Math.min(i + 1, suggestions.length - 1)) }
+    if (e.key === 'ArrowUp')   { e.preventDefault(); setActiveIndex(i => Math.max(i - 1, 0)) }
+    if (e.key === 'Enter')     { e.preventDefault(); handleSelect(suggestions[activeIndex]) }
+    if (e.key === 'Escape')    { setShowSuggestions(false) }
+  }
+
+  function handleSelect(asset: Asset) {
+    setQuery('')
+    setShowSuggestions(false)
+    setError(null)
     startTransition(async () => {
-      await removeAssetFromAllocation(allocation.id, assetId)
+      let result: any
+      if (mode === 'assign') {
+        const fd = new FormData()
+        fd.append('allocationId', String(allocation.id))
+        fd.append('assetId', String(asset.id))
+        result = await addAssetToAllocation(null, fd)
+      } else {
+        result = await removeAssetFromAllocation(allocation.id, asset.id)
+      }
+      if (result?.error) setError(result.error)
     })
+    inputRef.current?.focus()
   }
 
   return (
@@ -55,41 +100,73 @@ export default function AllocationDetail({ allocation, allAssets, canManage }: {
                     {asset.location && ` · ${asset.location.name}`}
                   </p>
                 </div>
-                <div className="flex items-center gap-3 shrink-0">
-                  <span className="text-xs text-zinc-400">{asset.status}</span>
-                  {canManage && (
-                    <button
-                      type="button"
-                      onClick={() => handleRemove(asset.id)}
-                      className="rounded-lg bg-zinc-800 px-3 py-1 text-zinc-400 text-xs hover:bg-red-900 hover:text-red-300">
-                      Remove
-                    </button>
-                  )}
-                </div>
+                <span className="text-xs text-zinc-400 shrink-0">{asset.status}</span>
               </div>
             ))
           )}
         </div>
       </div>
 
-      {canManage && available.length > 0 && (
-        <form action={addAction} className="flex gap-2">
-          <input type="hidden" name="allocationId" value={allocation.id} />
-          <select name="assetId" defaultValue=""
-            className="flex-1 rounded-xl bg-zinc-800 px-4 py-2 text-white border border-zinc-700 text-sm focus:outline-none focus:border-zinc-500">
-            <option value="">Select an asset to add…</option>
-            {available.map(a => (
-              <option key={a.id} value={a.id}>{a.name} ({a.assetTag})</option>
-            ))}
-          </select>
-          <button type="submit"
-            className="rounded-xl bg-white px-4 py-2 text-black text-sm font-medium hover:bg-zinc-200">
-            Add
-          </button>
-        </form>
-      )}
+      {canManage && (
+        <div className="space-y-3">
+          {/* Mode toggle */}
+          <div className="flex rounded-xl bg-zinc-800 p-1 gap-1 w-fit">
+            <button
+              type="button"
+              onClick={() => { setMode('assign'); setQuery('') }}
+              className={`rounded-lg px-4 py-1.5 text-sm font-medium transition-colors ${mode === 'assign' ? 'bg-white text-black' : 'text-zinc-400 hover:text-white'}`}
+            >
+              Assign
+            </button>
+            <button
+              type="button"
+              onClick={() => { setMode('deassign'); setQuery('') }}
+              className={`rounded-lg px-4 py-1.5 text-sm font-medium transition-colors ${mode === 'deassign' ? 'bg-white text-black' : 'text-zinc-400 hover:text-white'}`}
+            >
+              Remove
+            </button>
+          </div>
 
-      {addState?.error && <p className="text-red-400 text-sm">{addState.error}</p>}
+          {/* Search input */}
+          <div ref={containerRef} className="relative">
+            <input
+              ref={inputRef}
+              value={query}
+              onChange={e => { setQuery(e.target.value); setShowSuggestions(true); setActiveIndex(0) }}
+              onFocus={() => setShowSuggestions(true)}
+              onKeyDown={handleKeyDown}
+              placeholder={mode === 'assign' ? 'Search assets to add…' : 'Search assets to remove…'}
+              disabled={isPending}
+              className="w-full rounded-xl bg-zinc-800 px-4 py-2.5 text-white placeholder-zinc-500 border border-zinc-700 focus:outline-none focus:border-zinc-500 text-sm disabled:opacity-50"
+            />
+
+            {showSuggestions && (
+              <div className="absolute top-full mt-1 left-0 right-0 z-30 rounded-xl border border-zinc-700 bg-zinc-900 shadow-xl overflow-hidden">
+                {suggestions.length === 0 ? (
+                  <p className="px-4 py-3 text-sm text-zinc-500">
+                    {query ? 'No matches' : mode === 'assign' ? 'No assets available to add' : 'No assets to remove'}
+                  </p>
+                ) : (
+                  suggestions.map((a, i) => (
+                    <button
+                      key={a.id}
+                      type="button"
+                      onMouseEnter={() => setActiveIndex(i)}
+                      onMouseDown={e => { e.preventDefault(); handleSelect(a) }}
+                      className={`w-full flex items-center justify-between px-4 py-2.5 text-left transition-colors ${i === activeIndex ? 'bg-zinc-700' : 'hover:bg-zinc-800'}`}
+                    >
+                      <span className="text-sm text-white">{a.name}</span>
+                      <span className="text-xs text-zinc-500 ml-3">{a.assetTag}</span>
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+
+          {error && <p className="text-red-400 text-sm">{error}</p>}
+        </div>
+      )}
     </div>
   )
 }

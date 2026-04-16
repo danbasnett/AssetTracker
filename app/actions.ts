@@ -8,6 +8,7 @@ import path from 'path'
 import { getSession, hasRole, requireAuth } from '../lib/session'
 import type { Role } from '../lib/session'
 import { redirect } from 'next/navigation'
+import { audit, diff } from '../lib/audit'
 
 // Dummy hash used to prevent timing-based username enumeration.
 // bcrypt.compare always runs even when the username doesn't exist.
@@ -39,12 +40,13 @@ export async function login(prevState: any, formData: FormData) {
   session.role = user.role as Role
   session.isLoggedIn = true
   await session.save()
-
+  await audit(user.id, user.username, 'LOGIN', 'User', user.id, user.username)
   return { success: true }
 }
 
 export async function logout() {
   const session = await getSession()
+  await audit(session.userId, session.username, 'LOGOUT', 'User', session.userId, session.username)
   session.destroy()
   redirect('/login')
 }
@@ -256,8 +258,9 @@ export async function addAsset(prevState: any, formData: FormData) {
   const purchaseDate = formData.get('purchaseDate') as string
   const value = formData.get('value') as string
 
+  let created: any
   try {
-    await prisma.asset.create({
+    created = await prisma.asset.create({
     data: {
       name, assetTag, status,
       locationId: locationId ? parseInt(locationId) : null,
@@ -275,6 +278,7 @@ export async function addAsset(prevState: any, formData: FormData) {
     return { error: 'Something went wrong' }
   }
 
+  await audit(session.userId, session.username, 'CREATE', 'Asset', created.id, name, { assetTag, status, serialNumber: serialNumber||null, modelNumber: modelNumber||null, supplier: supplier||null, purchaseDate: purchaseDate||null, value: value||null, locationId: locationId||null })
   revalidatePath('/assets')
   return { success: true }
 }
@@ -289,12 +293,9 @@ export async function deleteAssets(prevState: any, formData: FormData) {
     return { error: 'No assets selected' }
   }
 
-  await prisma.asset.deleteMany({
-    where: {
-      id: { in: ids.map(id => parseInt(id)) }
-    }
-  })
-
+  const toDelete = await prisma.asset.findMany({ where: { id: { in: ids.map(id => parseInt(id)) } }, select: { id: true, name: true, assetTag: true } })
+  await prisma.asset.deleteMany({ where: { id: { in: ids.map(id => parseInt(id)) } } })
+  await audit(session.userId, session.username, 'DELETE', 'Asset', undefined, undefined, { deleted: toDelete })
   revalidatePath('/assets')
   return { success: true }
 }
@@ -307,15 +308,76 @@ export async function addLocation(prevState: any, formData: FormData) {
   const name = formData.get('name') as string
   const parentId = formData.get('parentId') as string
 
-  await prisma.location.create({
+  const newLoc = await prisma.location.create({
     data: {
       name,
       parent: parentId ? { connect: { id: parseInt(parentId) } } : undefined
     }
   })
 
+  await audit(session.userId, session.username, 'CREATE', 'Location', newLoc.id, name, { name, parentId: parentId ? parseInt(parentId) : null })
   revalidatePath('/locations')
   return null
+}
+
+export async function updateLocation(prevState: any, formData: FormData) {
+  const session = await requireAuth()
+  if (!hasRole(session.role, 'ASSET_CONTROL')) return { error: 'Insufficient permissions' }
+
+  const id = parseInt(formData.get('id') as string)
+  const name = (formData.get('name') as string).trim()
+  const parentId = formData.get('parentId') as string
+
+  if (!name) return { error: 'Name is required' }
+
+  if (parentId) {
+    const newParentId = parseInt(parentId)
+    if (newParentId === id) return { error: 'A location cannot be its own parent' }
+
+    // Walk up the ancestor chain of the chosen parent — if we hit `id`, it's circular
+    const all = await prisma.location.findMany({ select: { id: true, parentId: true } })
+    const parentMap = Object.fromEntries(all.map(l => [l.id, l.parentId]))
+    let cursor: number | null = newParentId
+    while (cursor !== null) {
+      cursor = parentMap[cursor] ?? null
+      if (cursor === id) return { error: 'This would create a circular reference' }
+    }
+  }
+
+  const beforeLoc = await prisma.location.findUnique({ where: { id } })
+  await prisma.location.update({
+    where: { id },
+    data: { name, parentId: parentId ? parseInt(parentId) : null },
+  })
+
+  const changesLoc = beforeLoc ? diff(
+    { name: beforeLoc.name, parentId: beforeLoc.parentId },
+    { name, parentId: parentId ? parseInt(parentId) : null }
+  ) : {}
+  await audit(session.userId, session.username, 'UPDATE', 'Location', id, name, { changes: changesLoc })
+  revalidatePath('/locations')
+  revalidatePath(`/locations/${id}`)
+  return { success: true }
+}
+
+export async function updateLocationDetails(prevState: any, formData: FormData) {
+  const session = await requireAuth()
+  if (!hasRole(session.role, 'ASSET_CONTROL')) return { error: 'Insufficient permissions' }
+
+  const id = parseInt(formData.get('id') as string)
+  const address = (formData.get('address') as string).trim() || null
+  const notes = (formData.get('notes') as string).trim() || null
+
+  const beforeLD = await (prisma.location as any).findUnique({ where: { id } })
+  await (prisma.location as any).update({
+    where: { id },
+    data: { address, notes },
+  })
+
+  const changesLD = beforeLD ? diff({ address: beforeLD.address, notes: beforeLD.notes }, { address, notes }) : {}
+  await audit(session.userId, session.username, 'UPDATE', 'Location', id, beforeLD?.name, { changes: changesLD })
+  revalidatePath(`/locations/${id}`)
+  return { success: true }
 }
 
 export async function deleteLocations(prevState: any, formData: FormData) {
@@ -328,12 +390,14 @@ export async function deleteLocations(prevState: any, formData: FormData) {
     return { error: 'No locations selected' }
   }
 
+  const toDeleteLocs = await prisma.location.findMany({ where: { id: { in: ids.map(id => parseInt(id)) } }, select: { id: true, name: true } })
   await prisma.location.deleteMany({
     where: {
       id: { in: ids.map(id => parseInt(id)) }
     }
   })
 
+  await audit(session.userId, session.username, 'DELETE', 'Location', undefined, undefined, { deleted: toDeleteLocs })
   revalidatePath('/locations')
   return { success: true }
 }
@@ -352,6 +416,8 @@ export async function updateAsset(prevState: any, formData: FormData) {
   const supplier = formData.get('supplier') as string
   const purchaseDate = formData.get('purchaseDate') as string
   const value = formData.get('value') as string
+
+  const before = await prisma.asset.findUnique({ where: { id: parseInt(id) } })
 
   try {
     await prisma.asset.update({
@@ -375,6 +441,11 @@ export async function updateAsset(prevState: any, formData: FormData) {
     return { error: 'Something went wrong' }
   }
 
+  const changes = before ? diff(
+    { name: before.name, assetTag: before.assetTag, status: before.status, serialNumber: before.serialNumber, modelNumber: before.modelNumber, supplier: before.supplier, value: before.value, locationId: before.locationId },
+    { name, assetTag, status, serialNumber: serialNumber||null, modelNumber: modelNumber||null, supplier: supplier||null, value: value ? parseFloat(value) : null, locationId: locationId ? parseInt(locationId) : null }
+  ) : {}
+  await audit(session.userId, session.username, 'UPDATE', 'Asset', parseInt(id), name, { changes })
   revalidatePath('/assets')
   return { success: true }
 }
@@ -401,6 +472,7 @@ export async function addConsumable(prevState: any, formData: FormData) {
     }
   })
 
+  await audit(session.userId, session.username, 'CREATE', 'Consumable', undefined, name, { name, quantity: parseInt(quantity)||0, unit: unit||'each', reorderPoint: parseInt(reorderPoint)||5, modelNumber: modelNumber||null, locationId: locationId||null })
   revalidatePath('/items')
   return { success: true }
 }
@@ -409,10 +481,9 @@ export async function updateAssetNotes(id: number, notes: string) {
   const session = await requireAuth()
   if (!hasRole(session.role, 'ASSET_CONTROL')) return
 
-  await prisma.asset.update({
-    where: { id },
-    data: { notes: notes || null }
-  })
+  const beforeAN = await prisma.asset.findUnique({ where: { id }, select: { name: true, notes: true } })
+  await prisma.asset.update({ where: { id }, data: { notes: notes || null } })
+  await audit(session.userId, session.username, 'UPDATE', 'Asset', id, beforeAN?.name, { changes: { notes: { from: beforeAN?.notes ?? null, to: notes || null } } })
   revalidatePath(`/assets/${id}`)
 }
 
@@ -420,10 +491,9 @@ export async function updateConsumableNotes(id: number, notes: string) {
   const session = await requireAuth()
   if (!hasRole(session.role, 'ASSET_CONTROL')) return
 
-  await prisma.consumable.update({
-    where: { id },
-    data: { notes: notes || null }
-  })
+  const beforeCN = await prisma.consumable.findUnique({ where: { id }, select: { name: true, notes: true } })
+  await prisma.consumable.update({ where: { id }, data: { notes: notes || null } })
+  await audit(session.userId, session.username, 'UPDATE', 'Consumable', id, beforeCN?.name, { changes: { notes: { from: (beforeCN as any)?.notes ?? null, to: notes || null } } })
   revalidatePath(`/items/${id}`)
 }
 
@@ -434,11 +504,13 @@ export async function adjustConsumableQuantity(id: number, delta: number) {
   const item = await prisma.consumable.findUnique({ where: { id } })
   if (!item) return
 
+  const newQty = Math.max(0, item.quantity + delta)
   await prisma.consumable.update({
     where: { id },
-    data: { quantity: Math.max(0, item.quantity + delta) }
+    data: { quantity: newQty }
   })
 
+  await audit(session.userId, session.username, 'UPDATE', 'Consumable', id, item.name, { changes: { quantity: { from: item.quantity, to: newQty } } })
   revalidatePath('/items')
 }
 
@@ -454,6 +526,7 @@ export async function updateConsumable(prevState: any, formData: FormData) {
   const locationId = formData.get('locationId') as string
   const modelNumber = formData.get('modelNumber') as string
 
+  const beforeC = await prisma.consumable.findUnique({ where: { id: parseInt(id) } })
   await prisma.consumable.update({
     where: { id: parseInt(id) },
     data: {
@@ -466,6 +539,11 @@ export async function updateConsumable(prevState: any, formData: FormData) {
     }
   })
 
+  const changesC = beforeC ? diff(
+    { name: beforeC.name, quantity: beforeC.quantity, unit: beforeC.unit, reorderPoint: beforeC.reorderPoint, modelNumber: beforeC.modelNumber, locationId: beforeC.locationId },
+    { name, quantity: parseInt(quantity)||0, unit, reorderPoint: parseInt(reorderPoint)||0, modelNumber: modelNumber||null, locationId: locationId ? parseInt(locationId) : null }
+  ) : {}
+  await audit(session.userId, session.username, 'UPDATE', 'Consumable', parseInt(id), name, { changes: changesC })
   revalidatePath('/items')
   return { success: true }
 }
@@ -491,6 +569,7 @@ export async function createAllocation(prevState: any, formData: FormData) {
     }
   })
 
+  await audit(session.userId, session.username, 'CREATE', 'Allocation', undefined, name, { name, startDate: startDate||null, endDate: (indefinite||!endDate) ? null : endDate, indefinite })
   revalidatePath('/allocations')
   return { success: true }
 }
@@ -500,7 +579,9 @@ export async function deleteAllocation(prevState: any, formData: FormData) {
   if (!hasRole(session.role, 'MANAGEMENT')) return { error: 'Insufficient permissions' }
 
   const id = formData.get('id') as string
+  const allocDel = await prisma.allocation.findUnique({ where: { id: parseInt(id) } })
   await prisma.allocation.delete({ where: { id: parseInt(id) } })
+  await audit(session.userId, session.username, 'DELETE', 'Allocation', parseInt(id), allocDel?.name, { name: allocDel?.name, startDate: allocDel?.startDate, endDate: allocDel?.endDate, indefinite: allocDel?.indefinite })
   revalidatePath('/allocations')
   return { success: true }
 }
@@ -514,11 +595,16 @@ export async function addAssetToAllocation(prevState: any, formData: FormData) {
 
   if (!assetId) return { error: 'Select an asset' }
 
+  const [assignAsset, assignAlloc] = await Promise.all([
+    prisma.asset.findUnique({ where: { id: assetId }, select: { name: true, assetTag: true } }),
+    prisma.allocation.findUnique({ where: { id: allocationId }, select: { name: true } }),
+  ])
   await prisma.allocation.update({
     where: { id: allocationId },
     data: { assets: { connect: { id: assetId } } }
   })
 
+  await audit(session.userId, session.username, 'ASSIGN', 'Allocation', allocationId, assignAlloc?.name, { allocation: assignAlloc?.name, asset: assignAsset?.name, assetTag: assignAsset?.assetTag })
   revalidatePath(`/allocations/${allocationId}`)
   return { success: true }
 }
@@ -527,10 +613,15 @@ export async function removeAssetFromAllocation(allocationId: number, assetId: n
   const session = await requireAuth()
   if (!hasRole(session.role, 'MANAGEMENT')) return
 
+  const [removeAsset, removeAlloc] = await Promise.all([
+    prisma.asset.findUnique({ where: { id: assetId }, select: { name: true, assetTag: true } }),
+    prisma.allocation.findUnique({ where: { id: allocationId }, select: { name: true } }),
+  ])
   await prisma.allocation.update({
     where: { id: allocationId },
     data: { assets: { disconnect: { id: assetId } } }
   })
+  await audit(session.userId, session.username, 'UNASSIGN', 'Allocation', allocationId, removeAlloc?.name, { allocation: removeAlloc?.name, asset: removeAsset?.name, assetTag: removeAsset?.assetTag })
   revalidatePath(`/allocations/${allocationId}`)
 }
 
@@ -601,6 +692,7 @@ export async function bulkUpdateAssets(prevState: any, formData: FormData) {
     return { error: 'No assets selected' }
   }
 
+  const affectedAssets = await prisma.asset.findMany({ where: { id: { in: ids.map(id => parseInt(id)) } }, select: { id: true, name: true, assetTag: true } })
   await prisma.asset.updateMany({
     where: { id: { in: ids.map(id => parseInt(id)) } },
     data: {
@@ -609,6 +701,11 @@ export async function bulkUpdateAssets(prevState: any, formData: FormData) {
     }
   })
 
+  await audit(session.userId, session.username, 'UPDATE', 'Asset', undefined, undefined, {
+    assets: affectedAssets.map(a => ({ id: a.id, name: a.name, assetTag: a.assetTag })),
+    ...(status ? { status } : {}),
+    ...(locationId ? { locationId: parseInt(locationId) } : {}),
+  })
   revalidatePath('/assets')
   return { success: true }
 }
@@ -625,7 +722,8 @@ export async function createPerson(prevState: any, formData: FormData) {
 
   if (!name) return { error: 'Name is required' }
 
-  await prisma.person.create({ data: { name, email, department } })
+  const person = await prisma.person.create({ data: { name, email, department } })
+  await audit(session.userId, session.username, 'CREATE', 'Person', person.id, name, { name, email, department })
   revalidatePath('/people')
   return { success: true }
 }
@@ -641,7 +739,10 @@ export async function updatePerson(prevState: any, formData: FormData) {
 
   if (!name) return { error: 'Name is required' }
 
+  const beforeP = await prisma.person.findUnique({ where: { id } })
   await prisma.person.update({ where: { id }, data: { name, email, department } })
+  const changesP = beforeP ? diff({ name: beforeP.name, email: beforeP.email, department: beforeP.department }, { name, email, department }) : {}
+  await audit(session.userId, session.username, 'UPDATE', 'Person', id, name, { changes: changesP })
   revalidatePath('/people')
   revalidatePath(`/people/${id}`)
   return { success: true }
@@ -652,7 +753,9 @@ export async function deletePerson(prevState: any, formData: FormData) {
   if (!hasRole(session.role, 'ASSET_CONTROL')) return { error: 'Insufficient permissions' }
 
   const id = parseInt(formData.get('id') as string)
+  const personDel = await prisma.person.findUnique({ where: { id } })
   await prisma.person.delete({ where: { id } })
+  await audit(session.userId, session.username, 'DELETE', 'Person', id, personDel?.name, { name: personDel?.name, email: personDel?.email, department: personDel?.department })
   revalidatePath('/people')
   return { success: true }
 }
@@ -666,7 +769,12 @@ export async function assignAssetToPerson(prevState: any, formData: FormData) {
 
   if (!assetId) return { error: 'Select an asset' }
 
+  const [assignPerson, assignA] = await Promise.all([
+    prisma.person.findUnique({ where: { id: personId }, select: { name: true } }),
+    prisma.asset.findUnique({ where: { id: assetId }, select: { name: true, assetTag: true } }),
+  ])
   await prisma.asset.update({ where: { id: assetId }, data: { assigneeId: personId } })
+  await audit(session.userId, session.username, 'ASSIGN', 'Person', personId, assignPerson?.name, { person: assignPerson?.name, asset: assignA?.name, assetTag: assignA?.assetTag })
   revalidatePath(`/people/${personId}`)
   return { success: true }
 }
@@ -675,7 +783,12 @@ export async function unassignAsset(assetId: number, personId: number) {
   const session = await requireAuth()
   if (!hasRole(session.role, 'ASSET_CONTROL')) return
 
+  const [unassignPerson, unassignA] = await Promise.all([
+    prisma.person.findUnique({ where: { id: personId }, select: { name: true } }),
+    prisma.asset.findUnique({ where: { id: assetId }, select: { name: true, assetTag: true } }),
+  ])
   await prisma.asset.update({ where: { id: assetId }, data: { assigneeId: null } })
+  await audit(session.userId, session.username, 'UNASSIGN', 'Person', personId, unassignPerson?.name, { person: unassignPerson?.name, asset: unassignA?.name, assetTag: unassignA?.assetTag })
   revalidatePath(`/people/${personId}`)
 }
 
@@ -712,6 +825,8 @@ export async function createMaintenance(prevState: any, formData: FormData) {
     }
   })
 
+  const mAsset = await prisma.asset.findUnique({ where: { id: assetId }, select: { name: true, assetTag: true } })
+  await audit(session.userId, session.username, 'CREATE', 'Maintenance', undefined, title, { asset: mAsset?.name, assetTag: mAsset?.assetTag, title, description, status: completedDate ? 'COMPLETED' : status, scheduledDate: scheduledDate||null, cost: cost||null })
   revalidatePath('/maintenance')
   return { success: true }
 }
@@ -732,6 +847,8 @@ export async function updateMaintenance(prevState: any, formData: FormData) {
 
   if (!title) return { error: 'Title is required' }
 
+  const beforeM = await (prisma.maintenance as any).findUnique({ where: { id } })
+
   await (prisma.maintenance as any).update({
     where: { id },
     data: {
@@ -746,6 +863,14 @@ export async function updateMaintenance(prevState: any, formData: FormData) {
     }
   })
 
+  const mAssetUpd = beforeM ? await prisma.asset.findUnique({ where: { id: beforeM.assetId }, select: { name: true, assetTag: true } }) : null
+  await audit(session.userId, session.username, 'UPDATE', 'Maintenance', id, title, {
+    asset: mAssetUpd?.name, assetTag: mAssetUpd?.assetTag,
+    changes: beforeM ? diff(
+      { title: beforeM.title, status: beforeM.status, scheduledDate: String(beforeM.scheduledDate), completedDate: String(beforeM.completedDate), cost: beforeM.cost, description: beforeM.description },
+      { title, status: completedDate ? 'COMPLETED' : status, scheduledDate, completedDate, cost: cost||null, description }
+    ) : {}
+  })
   revalidatePath('/maintenance')
   return { success: true }
 }
@@ -755,7 +880,9 @@ export async function deleteMaintenance(prevState: any, formData: FormData) {
   if (!hasRole(session.role, 'ASSET_CONTROL')) return { error: 'Insufficient permissions' }
 
   const id = parseInt(formData.get('id') as string)
+  const mDel = await (prisma.maintenance as any).findUnique({ where: { id }, include: { asset: { select: { name: true, assetTag: true } } } })
   await prisma.maintenance.delete({ where: { id } })
+  await audit(session.userId, session.username, 'DELETE', 'Maintenance', id, mDel?.title, { title: mDel?.title, asset: mDel?.asset?.name, assetTag: mDel?.asset?.assetTag, status: mDel?.status, scheduledDate: mDel?.scheduledDate })
   revalidatePath('/maintenance')
   return { success: true }
 }
@@ -816,6 +943,7 @@ export async function deleteAllData() {
   const session = await requireAuth()
   if (!hasRole(session.role, 'ADMIN')) return { error: 'Insufficient permissions' }
 
+  await audit(session.userId, session.username, 'DELETE_ALL', 'System', undefined, undefined, 'All data deleted')
   await prisma.maintenance.deleteMany()
   await prisma.allocation.deleteMany()
   await prisma.asset.deleteMany()
@@ -825,4 +953,210 @@ export async function deleteAllData() {
 
   revalidatePath('/', 'layout')
   return { success: true }
+}
+
+// ── CSV Import ────────────────────────────────────────────────────────────────
+
+function parseCSV(text: string): Record<string, string>[] {
+  const lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim().split('\n')
+  if (lines.length < 2) return []
+  const headers = lines[0].split(',').map(h => h.trim().toLowerCase())
+  return lines.slice(1).filter(l => l.trim()).map(line => {
+    const values: string[] = []
+    let cur = '', inQuote = false
+    for (let i = 0; i < line.length; i++) {
+      if (line[i] === '"') { inQuote = !inQuote }
+      else if (line[i] === ',' && !inQuote) { values.push(cur.trim()); cur = '' }
+      else cur += line[i]
+    }
+    values.push(cur.trim())
+    return Object.fromEntries(headers.map((h, i) => [h, values[i] ?? '']))
+  })
+}
+
+function parseDate(val: string): Date | null {
+  if (!val) return null
+  const [d, m, y] = val.split('/')
+  if (!d || !m || !y) return null
+  const date = new Date(parseInt(y), parseInt(m) - 1, parseInt(d))
+  return isNaN(date.getTime()) ? null : date
+}
+
+export async function importAssets(prevState: any, formData: FormData) {
+  const session = await requireAuth()
+  if (!hasRole(session.role, 'ASSET_CONTROL')) return { error: 'Insufficient permissions' }
+
+  const file = formData.get('file') as File
+  if (!file || file.size === 0) return { error: 'No file selected' }
+
+  const text = await file.text()
+  const rows = parseCSV(text)
+  if (rows.length === 0) return { error: 'No data rows found' }
+
+  const locationNames = [...new Set(rows.map(r => r.location).filter(Boolean))]
+  const locations = await prisma.location.findMany({ where: { name: { in: locationNames } } })
+  const locationMap = Object.fromEntries(locations.map(l => [l.name.toLowerCase(), l.id]))
+
+  let imported = 0, skipped = 0
+  const errors: string[] = []
+
+  for (const [i, row] of rows.entries()) {
+    const rowNum = i + 2
+    if (!row.name || !row.assettag) { errors.push(`Row ${rowNum}: name and assetTag are required`); skipped++; continue }
+    try {
+      await prisma.asset.upsert({
+        where: { assetTag: row.assettag },
+        update: {
+          name: row.name,
+          status: row.status || 'Available',
+          locationId: row.location ? (locationMap[row.location.toLowerCase()] ?? null) : null,
+          serialNumber: row.serialnumber || null,
+          modelNumber: row.modelnumber || null,
+          supplier: row.supplier || null,
+          purchaseDate: parseDate(row.purchasedate),
+          value: row.value ? parseFloat(row.value) : null,
+        },
+        create: {
+          name: row.name,
+          assetTag: row.assettag,
+          status: row.status || 'Available',
+          locationId: row.location ? (locationMap[row.location.toLowerCase()] ?? null) : null,
+          serialNumber: row.serialnumber || null,
+          modelNumber: row.modelnumber || null,
+          supplier: row.supplier || null,
+          purchaseDate: parseDate(row.purchasedate),
+          value: row.value ? parseFloat(row.value) : null,
+        },
+      })
+      imported++
+    } catch (e: any) {
+      errors.push(`Row ${rowNum} (${row.name}): ${e.message}`)
+      skipped++
+    }
+  }
+
+  await audit(session.userId, session.username, 'IMPORT', 'Asset', undefined, undefined, `Imported ${imported}, skipped ${skipped}`)
+  revalidatePath('/assets')
+  return { success: true, imported, skipped, errors }
+}
+
+export async function importConsumables(prevState: any, formData: FormData) {
+  const session = await requireAuth()
+  if (!hasRole(session.role, 'ASSET_CONTROL')) return { error: 'Insufficient permissions' }
+
+  const file = formData.get('file') as File
+  if (!file || file.size === 0) return { error: 'No file selected' }
+
+  const text = await file.text()
+  const rows = parseCSV(text)
+  if (rows.length === 0) return { error: 'No data rows found' }
+
+  const locationNames = [...new Set(rows.map(r => r.location).filter(Boolean))]
+  const locations = await prisma.location.findMany({ where: { name: { in: locationNames } } })
+  const locationMap = Object.fromEntries(locations.map(l => [l.name.toLowerCase(), l.id]))
+
+  let imported = 0, skipped = 0
+  const errors: string[] = []
+
+  for (const [i, row] of rows.entries()) {
+    const rowNum = i + 2
+    if (!row.name) { errors.push(`Row ${rowNum}: name is required`); skipped++; continue }
+    try {
+      await prisma.consumable.create({
+        data: {
+          name: row.name,
+          quantity: row.quantity ? parseInt(row.quantity) : 0,
+          reorderPoint: row.reorderpoint ? parseInt(row.reorderpoint) : 5,
+          unit: row.unit || 'each',
+          modelNumber: row.modelnumber || null,
+          locationId: row.location ? (locationMap[row.location.toLowerCase()] ?? null) : null,
+          notes: row.notes || null,
+        },
+      })
+      imported++
+    } catch (e: any) {
+      errors.push(`Row ${rowNum} (${row.name}): ${e.message}`)
+      skipped++
+    }
+  }
+
+  await audit(session.userId, session.username, 'IMPORT', 'Consumable', undefined, undefined, `Imported ${imported}, skipped ${skipped}`)
+  revalidatePath('/items')
+  return { success: true, imported, skipped, errors }
+}
+
+export async function importLocations(prevState: any, formData: FormData) {
+  const session = await requireAuth()
+  if (!hasRole(session.role, 'ASSET_CONTROL')) return { error: 'Insufficient permissions' }
+
+  const file = formData.get('file') as File
+  if (!file || file.size === 0) return { error: 'No file selected' }
+
+  const text = await file.text()
+  const rows = parseCSV(text)
+  if (rows.length === 0) return { error: 'No data rows found' }
+
+  let imported = 0, skipped = 0
+  const errors: string[] = []
+  const created: Record<string, number> = {}
+
+  // Pre-load existing locations
+  const existing = await prisma.location.findMany()
+  for (const l of existing) created[l.name.toLowerCase()] = l.id
+
+  for (const [i, row] of rows.entries()) {
+    const rowNum = i + 2
+    if (!row.name) { errors.push(`Row ${rowNum}: name is required`); skipped++; continue }
+    if (created[row.name.toLowerCase()]) { skipped++; continue }
+    try {
+      const parentId = row.parent ? (created[row.parent.toLowerCase()] ?? null) : null
+      const loc = await prisma.location.create({ data: { name: row.name, parentId } })
+      created[row.name.toLowerCase()] = loc.id
+      imported++
+    } catch (e: any) {
+      errors.push(`Row ${rowNum} (${row.name}): ${e.message}`)
+      skipped++
+    }
+  }
+
+  await audit(session.userId, session.username, 'IMPORT', 'Location', undefined, undefined, `Imported ${imported}, skipped ${skipped}`)
+  revalidatePath('/locations')
+  return { success: true, imported, skipped, errors }
+}
+
+export async function importPeople(prevState: any, formData: FormData) {
+  const session = await requireAuth()
+  if (!hasRole(session.role, 'ASSET_CONTROL')) return { error: 'Insufficient permissions' }
+
+  const file = formData.get('file') as File
+  if (!file || file.size === 0) return { error: 'No file selected' }
+
+  const text = await file.text()
+  const rows = parseCSV(text)
+  if (rows.length === 0) return { error: 'No data rows found' }
+
+  let imported = 0, skipped = 0
+  const errors: string[] = []
+
+  for (const [i, row] of rows.entries()) {
+    const rowNum = i + 2
+    if (!row.name) { errors.push(`Row ${rowNum}: name is required`); skipped++; continue }
+    try {
+      await prisma.person.create({
+        data: {
+          name: row.name,
+          email: row.email || null,
+          department: row.department || null,
+        },
+      })
+      imported++
+    } catch (e: any) {
+      errors.push(`Row ${rowNum} (${row.name}): ${e.message}`)
+      skipped++
+    }
+  }
+
+  await audit(session.userId, session.username, 'IMPORT', 'Person', undefined, undefined, `Imported ${imported}, skipped ${skipped}`)
+  revalidatePath('/people')
+  return { success: true, imported, skipped, errors }
 }
