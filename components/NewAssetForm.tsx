@@ -1,14 +1,19 @@
 'use client'
 
-import { useActionState, useEffect } from 'react'
+import { useActionState, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { ScanLine } from 'lucide-react'
+import dynamic from 'next/dynamic'
 import { addAsset } from '../app/actions'
+const BarcodeScanner = dynamic(() => import('./BarcodeScanner'), { ssr: false })
 
 type Location = { id: number; name: string }
 type Status = { id: number; name: string }
 
 export default function NewAssetForm({ locations, statuses }: { locations: Location[]; statuses: Status[] }) {
   const [state, formAction] = useActionState(addAsset, null)
+  const [assetTag, setAssetTag] = useState('')
+  const [scanning, setScanning] = useState(false)
   const router = useRouter()
 
   useEffect(() => {
@@ -16,6 +21,13 @@ export default function NewAssetForm({ locations, statuses }: { locations: Locat
   }, [state])
 
   return (
+    <>
+    {scanning && (
+      <BarcodeScanner
+        onResult={text => { setAssetTag(text); setScanning(false) }}
+        onClose={() => setScanning(false)}
+      />
+    )}
     <form action={formAction} className="mt-8 space-y-6">
       {state?.error && (
         <p className="text-red-400 text-sm">{state.error}</p>
@@ -31,8 +43,15 @@ export default function NewAssetForm({ locations, statuses }: { locations: Locat
           </div>
           <div className="flex items-center px-6 py-4 gap-4">
             <label className="text-zinc-400 w-36 shrink-0">Asset Tag <span className="text-red-400">*</span></label>
-            <input name="assetTag" required placeholder="e.g. DRILL-001"
-              className="flex-1 rounded-lg bg-zinc-800 px-3 py-2 text-white placeholder-zinc-600 border border-zinc-700 focus:outline-none focus:border-zinc-500" />
+            <div className="flex-1 relative flex items-center">
+              <input name="assetTag" required placeholder="e.g. DRILL-001"
+                value={assetTag} onChange={e => setAssetTag(e.target.value)}
+                className="w-full rounded-lg bg-zinc-800 pl-3 pr-10 py-2 text-white placeholder-zinc-600 border border-zinc-700 focus:outline-none focus:border-zinc-500" />
+              <button type="button" onClick={() => setScanning(true)}
+                className="absolute right-3 text-zinc-500 hover:text-white transition-colors" title="Scan barcode">
+                <ScanLine size={16} />
+              </button>
+            </div>
           </div>
           <div className="flex items-center px-6 py-4 gap-4">
             <label className="text-zinc-400 w-36 shrink-0">Status</label>
@@ -104,5 +123,6 @@ export default function NewAssetForm({ locations, statuses }: { locations: Locat
         </button>
       </div>
     </form>
+    </>
   )
 }

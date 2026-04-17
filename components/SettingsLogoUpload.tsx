@@ -6,11 +6,12 @@ import { uploadLogo, removeLogo } from '../app/actions'
 export default function SettingsLogoUpload({ currentLogoUrl }: { currentLogoUrl?: string }) {
   const [state, formAction] = useActionState(uploadLogo, null)
   const [preview, setPreview] = useState<string | null>(null)
+  const [bust, setBust] = useState('')
   const [, startTransition] = useTransition()
 
-  // Clear local preview once upload succeeds so the re-fetched URL (with new timestamp) shows
+  // After upload, clear local preview and add a cache-buster so the fresh file loads
   useEffect(() => {
-    if (state?.success) setPreview(null)
+    if (state?.success) { setPreview(null); setBust(`?t=${Date.now()}`) }
   }, [state])
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -22,7 +23,7 @@ export default function SettingsLogoUpload({ currentLogoUrl }: { currentLogoUrl?
     startTransition(async () => { await removeLogo() })
   }
 
-  const displayUrl = preview ?? currentLogoUrl
+  const displayUrl = preview ?? (currentLogoUrl ? currentLogoUrl + bust : null)
 
   return (
     <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-6 space-y-4">

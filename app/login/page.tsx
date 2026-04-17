@@ -2,6 +2,7 @@ import { prisma } from '../../lib/prisma'
 import { getSession } from '../../lib/session'
 import { redirect } from 'next/navigation'
 import LoginForm from '../../components/LoginForm'
+export const dynamic = 'force-dynamic'
 
 export default async function LoginPage({ searchParams }: { searchParams: Promise<{ from?: string }> }) {
   const session = await getSession()
@@ -14,5 +15,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
     (prisma as any).oAuthProvider.findMany({ where: { enabled: true }, orderBy: { createdAt: 'asc' } }).catch(() => []),
   ])
 
-  return <LoginForm isFirstTime={userCount === 0} from={from ?? '/'} logoUrl={logoSetting?.value ?? undefined} ssoProviders={ssoProviders} />
+  const logoUrl = logoSetting?.value?.split('?')[0] ?? undefined
+
+  return <LoginForm isFirstTime={userCount === 0} from={from ?? '/'} logoUrl={logoUrl} ssoProviders={ssoProviders} />
 }

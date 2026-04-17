@@ -5,6 +5,7 @@ import Link from 'next/link'
 import NoteEditor from '../../../components/NoteEditor'
 import AssetDetailEditor from '../../../components/AssetDetailEditor'
 import AssetExtras from '../../../components/AssetExtras'
+import AssetPhotoGallery from '../../../components/AssetPhotoGallery'
 import { updateAssetNotes } from '../../actions'
 
 export default async function AssetDetailPage({ params }: { params: Promise<{ id: string }> }) {
@@ -20,6 +21,7 @@ export default async function AssetDetailPage({ params }: { params: Promise<{ id
         assignee: { select: { id: true, name: true, department: true } },
         allocations: { orderBy: { startDate: 'desc' } },
         maintenance: { orderBy: { scheduledDate: 'desc' } },
+        photos: { orderBy: { createdAt: 'asc' } },
       },
     }) as Promise<any>,
     prisma.location.findMany({ orderBy: { name: 'asc' } }),
@@ -47,6 +49,12 @@ export default async function AssetDetailPage({ params }: { params: Promise<{ id
             'use server'
             await updateAssetNotes(asset.id, notes)
           }}
+        />
+
+        <AssetPhotoGallery
+          assetId={asset.id}
+          initialPhotos={asset.photos ?? []}
+          canEdit={canEdit}
         />
 
         <AssetExtras

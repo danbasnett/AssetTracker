@@ -224,8 +224,8 @@ export async function uploadLogo(prevState: any, formData: FormData) {
 
   await prisma.setting.upsert({
     where: { key: 'logoPath' },
-    update: { value: `/uploads/${filename}?t=${Date.now()}` },
-    create: { key: 'logoPath', value: `/uploads/${filename}?t=${Date.now()}` },
+    update: { value: `/uploads/${filename}` },
+    create: { key: 'logoPath', value: `/uploads/${filename}` },
   })
 
   revalidatePath('/', 'layout')
@@ -238,7 +238,9 @@ export async function removeLogo() {
 
   const setting = await prisma.setting.findUnique({ where: { key: 'logoPath' } })
   if (setting) {
-    try { await fs.unlink(path.join(process.cwd(), 'public', setting.value)) } catch {}
+    // Strip any legacy ?t= query string before building the fs path
+    const cleanPath = setting.value.split('?')[0]
+    try { await fs.unlink(path.join(process.cwd(), 'public', cleanPath)) } catch {}
     await prisma.setting.delete({ where: { key: 'logoPath' } })
   }
   revalidatePath('/', 'layout')

@@ -19,6 +19,14 @@ model Location {
   consumables Consumable[]
 }
 
+model AssetPhoto {
+  id        Int      @id @default(autoincrement())
+  assetId   Int
+  asset     Asset    @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  path      String
+  createdAt DateTime @default(now())
+}
+
 model Asset {
   id           Int           @id @default(autoincrement())
   name         String
@@ -37,6 +45,7 @@ model Asset {
   createdAt    DateTime      @default(now())
   allocations  Allocation[]  @relation("AllocationAssets")
   maintenance  Maintenance[]
+  photos       AssetPhoto[]
 }
 
 model Person {

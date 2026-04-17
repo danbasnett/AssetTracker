@@ -1,0 +1,6 @@
+CREATE TABLE "AssetPhoto" (
+  "id"        SERIAL PRIMARY KEY,
+  "assetId"   INTEGER NOT NULL REFERENCES "Asset"("id") ON DELETE CASCADE,
+  "path"      TEXT NOT NULL,
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+);

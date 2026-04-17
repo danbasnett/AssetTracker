@@ -2,7 +2,9 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { Search, X } from 'lucide-react'
+import { Search, X, ScanLine } from 'lucide-react'
+import dynamic from 'next/dynamic'
+const BarcodeScanner = dynamic(() => import('./BarcodeScanner'), { ssr: false })
 
 type ResultItem = { id: number; title: string; sub?: string; badge?: string; href: string }
 type ResultGroup = { type: string; items: ResultItem[] }
@@ -21,6 +23,7 @@ export default function GlobalSearch() {
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [activeIndex, setActiveIndex] = useState(0)
+  const [scanning, setScanning] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
@@ -90,25 +93,39 @@ export default function GlobalSearch() {
 
   let flatIndex = 0
 
+  function handleScanResult(text: string) {
+    setScanning(false)
+    setQuery(text)
+    setOpen(true)
+    fetchResults(text)
+  }
+
   return (
-    <div ref={containerRef} className="relative w-full max-w-xl">
-      <div className="relative flex items-center">
-        <Search size={15} className="absolute left-3 text-zinc-500 pointer-events-none" />
-        <input
-          ref={inputRef}
-          value={query}
-          onChange={e => { setQuery(e.target.value); setOpen(true) }}
-          onFocus={() => setOpen(true)}
-          onKeyDown={handleKeyDown}
-          placeholder="Search… (⌘K)"
-          className="w-full rounded-xl bg-zinc-800 pl-9 pr-8 py-2 text-sm text-white placeholder-zinc-500 border border-zinc-700 focus:outline-none focus:border-zinc-500"
-        />
-        {query && (
-          <button type="button" onClick={clear} className="absolute right-2.5 text-zinc-500 hover:text-white">
-            <X size={14} />
-          </button>
-        )}
-      </div>
+    <>
+      {scanning && <BarcodeScanner onResult={handleScanResult} onClose={() => setScanning(false)} />}
+      <div ref={containerRef} className="relative w-full max-w-xl">
+        <div className="relative flex items-center">
+          <Search size={15} className="absolute left-3 text-zinc-500 pointer-events-none" />
+          <input
+            ref={inputRef}
+            value={query}
+            onChange={e => { setQuery(e.target.value); setOpen(true) }}
+            onFocus={() => setOpen(true)}
+            onKeyDown={handleKeyDown}
+            placeholder="Search… (⌘K)"
+            className="w-full rounded-xl bg-zinc-800 pl-9 pr-16 py-2 text-sm text-white placeholder-zinc-500 border border-zinc-700 focus:outline-none focus:border-zinc-500"
+          />
+          <div className="absolute right-2.5 flex items-center gap-1">
+            {query && (
+              <button type="button" onClick={clear} className="text-zinc-500 hover:text-white">
+                <X size={14} />
+              </button>
+            )}
+            <button type="button" onClick={() => setScanning(true)} className="text-zinc-500 hover:text-white" title="Scan barcode">
+              <ScanLine size={16} />
+            </button>
+          </div>
+        </div>
 
       {open && query.length >= 2 && (
         <div className="absolute top-full mt-2 left-0 right-0 z-50 rounded-2xl border border-zinc-700 bg-zinc-900 shadow-2xl overflow-hidden max-h-[70vh] overflow-y-auto">
@@ -149,5 +166,6 @@ export default function GlobalSearch() {
         </div>
       )}
     </div>
+    </>
   )
 }

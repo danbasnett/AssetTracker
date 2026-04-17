@@ -44,7 +44,7 @@ export default async function RootLayout({
           <SidebarProvider>
             <div className="flex">
               <Sidebar
-                logoUrl={logoSetting?.value ?? undefined}
+                logoUrl={logoSetting?.value?.split('?')[0] ?? undefined}
                 userRole={userRole ?? 'VIEW_ONLY'}
                 username={session.username}
                 avatarUrl={currentUser?.avatarPath ?? undefined}
