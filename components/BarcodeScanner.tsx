@@ -11,7 +11,6 @@ type Props = {
 export default function BarcodeScanner({ onResult, onClose }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
-  const controlsRef = useRef<{ stop: () => void } | null>(null)
   const onResultRef = useRef(onResult)
   onResultRef.current = onResult
   const [error, setError] = useState<string | null>(null)
@@ -20,51 +19,60 @@ export default function BarcodeScanner({ onResult, onClose }: Props) {
 
   useEffect(() => {
     let cancelled = false
+    let animFrame: number
 
     const isSecure = location.protocol === 'https:' || location.hostname === 'localhost' || location.hostname === '127.0.0.1'
     if (!isSecure) {
-      setError('Camera access requires HTTPS. Connect via your domain with SSL enabled.')
+      setError('Camera access requires HTTPS.')
       return
     }
 
     async function start() {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'environment' }
+          video: { facingMode: { ideal: 'environment' } }
         })
-
         if (cancelled) { stream.getTracks().forEach(t => t.stop()); return }
 
         streamRef.current = stream
 
         const track = stream.getVideoTracks()[0]
-        const caps = track.getCapabilities?.() as any
+        const caps = (track as any).getCapabilities?.()
         if (caps?.torch) setTorchAvailable(true)
 
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream
-          await videoRef.current.play()
-        }
+        const video = videoRef.current!
+        video.srcObject = stream
+        video.setAttribute('playsinline', 'true')
+        await video.play()
 
         if (cancelled) return
 
-        const { BrowserMultiFormatReader } = await import('@zxing/browser')
-        const reader = new BrowserMultiFormatReader()
-
-        if (!videoRef.current || cancelled) return
-
-        const controls = await reader.decodeFromStream(
-          stream,
-          videoRef.current,
-          (result) => {
-            if (result && !cancelled) onResultRef.current(result.getText())
+        // Use native BarcodeDetector if available, else fall back to zxing
+        if ('BarcodeDetector' in window) {
+          const detector = new (window as any).BarcodeDetector()
+          function scan() {
+            if (cancelled) return
+            detector.detect(video).then((codes: any[]) => {
+              if (cancelled) return
+              if (codes.length > 0) {
+                onResultRef.current(codes[0].rawValue)
+              } else {
+                animFrame = requestAnimationFrame(scan)
+              }
+            }).catch(() => {
+              animFrame = requestAnimationFrame(scan)
+            })
           }
-        )
-
-        if (cancelled) {
-          controls.stop()
+          animFrame = requestAnimationFrame(scan)
         } else {
-          controlsRef.current = controls
+          const { BrowserMultiFormatReader } = await import('@zxing/browser')
+          if (cancelled) return
+          const reader = new BrowserMultiFormatReader()
+          // Decode continuously from the already-playing video element
+          reader.decodeFromVideoElement(video, (result, err) => {
+            if (cancelled) return
+            if (result) onResultRef.current(result.getText())
+          })
         }
       } catch (e: any) {
         if (cancelled) return
@@ -82,21 +90,23 @@ export default function BarcodeScanner({ onResult, onClose }: Props) {
 
     return () => {
       cancelled = true
-      controlsRef.current?.stop()
-      controlsRef.current = null
+      cancelAnimationFrame(animFrame)
       streamRef.current?.getTracks().forEach(t => t.stop())
       streamRef.current = null
+      if (videoRef.current) {
+        videoRef.current.srcObject = null
+      }
     }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [])
 
   async function toggleTorch() {
     const track = streamRef.current?.getVideoTracks()[0]
     if (!track) return
     try {
-      await track.applyConstraints({ advanced: [{ torch: !torchOn } as any] })
+      await (track as any).applyConstraints({ advanced: [{ torch: !torchOn }] })
       setTorchOn(v => !v)
     } catch {
-      // torch not supported on this device
+      // torch not supported
     }
   }
 
