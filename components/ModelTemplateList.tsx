@@ -96,6 +96,7 @@ function TemplateForm({
 export default function ModelTemplateList({ templates, locations }: { templates: Template[]; locations: Location[] }) {
   const [creating, setCreating] = useState(false)
   const [editingId, setEditingId] = useState<number | null>(null)
+  const [search, setSearch] = useState('')
   const [, startTransition] = useTransition()
 
   function handleDelete(id: number) {
@@ -103,12 +104,22 @@ export default function ModelTemplateList({ templates, locations }: { templates:
     startTransition(async () => { await deleteModelTemplate(id) })
   }
 
+  const filteredTemplates = templates.filter(t =>
+    !search ||
+    t.name.toLowerCase().includes(search.toLowerCase()) ||
+    (t.type ?? '').toLowerCase().includes(search.toLowerCase()) ||
+    (t.modelNumber ?? '').toLowerCase().includes(search.toLowerCase()) ||
+    (t.supplier ?? '').toLowerCase().includes(search.toLowerCase())
+  )
+
   return (
     <div className="space-y-4">
+      <input type="search" placeholder="Search templates…" value={search} onChange={e => setSearch(e.target.value)}
+        className="w-full rounded-xl bg-zinc-800 px-4 py-2.5 text-white placeholder-zinc-500 border border-zinc-700 focus:outline-none focus:border-zinc-500 text-sm" />
       {/* Existing templates */}
-      {templates.length > 0 && (
+      {filteredTemplates.length > 0 && (
         <div className="rounded-2xl border border-zinc-800 bg-zinc-900 divide-y divide-zinc-800">
-          {templates.map(t => (
+          {filteredTemplates.map(t => (
             <div key={t.id}>
               {editingId === t.id ? (
                 <div className="px-6 py-4">

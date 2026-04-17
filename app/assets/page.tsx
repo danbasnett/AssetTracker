@@ -8,12 +8,22 @@ export default async function AssetsPage() {
   const canEdit = hasRole(session.role, 'ASSET_CONTROL')
   const canAdmin = hasRole(session.role, 'ADMIN')
 
-  const [assets, locations, statuses, templates, allTags] = await Promise.all([
+  const [assets, locations, statuses, templates, allTags, kits] = await Promise.all([
     (prisma.asset.findMany as any)({ include: { location: true, tags: { include: { tag: true } } } }),
     prisma.location.findMany({ orderBy: { name: 'asc' } }),
     prisma.status.findMany({ orderBy: { name: 'asc' } }),
     (prisma as any).modelTemplate.findMany({ orderBy: { name: 'asc' } }),
     (prisma as any).tag.findMany({ orderBy: { name: 'asc' } }),
+    (prisma as any).kit.findMany({
+      orderBy: { name: 'asc' },
+      include: {
+        container: { include: { location: true, tags: { include: { tag: true } } } },
+        items: {
+          include: { asset: { include: { location: true, tags: { include: { tag: true } } } } },
+          orderBy: { asset: { name: 'asc' } },
+        },
+      },
+    }),
   ])
 
   return (
@@ -33,7 +43,7 @@ export default async function AssetsPage() {
         </div>
 
         <div className="mt-6">
-          <AssetTable assets={assets} locations={locations} statuses={statuses} templates={templates} allTags={allTags} canEdit={canEdit} canAdmin={canAdmin} />
+          <AssetTable assets={assets} locations={locations} statuses={statuses} templates={templates} allTags={allTags} kits={kits} canEdit={canEdit} canAdmin={canAdmin} />
         </div>
       </div>
     </main>

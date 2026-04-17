@@ -25,6 +25,8 @@ export default async function AssetDetailPage({ params }: { params: Promise<{ id
         maintenance: { orderBy: { scheduledDate: 'desc' } },
         photos: { orderBy: { createdAt: 'asc' } },
         tags: { include: { tag: true } },
+        kitItems: { include: { kit: { select: { id: true, name: true, kitCode: true } } } },
+        containerFor: { select: { id: true, name: true, kitCode: true } },
       },
     }) as Promise<any>,
     prisma.location.findMany({ orderBy: { name: 'asc' } }),
@@ -68,6 +70,38 @@ export default async function AssetDetailPage({ params }: { params: Promise<{ id
           initialPhotos={asset.photos ?? []}
           canEdit={canEdit}
         />
+
+        {/* Kit memberships */}
+        {((asset.kitItems?.length ?? 0) > 0 || (asset.containerFor?.length ?? 0) > 0) && (
+          <div className="mt-6">
+            {(asset.containerFor?.length ?? 0) > 0 && (
+              <div className="mb-3">
+                <p className="text-xs text-zinc-500 uppercase tracking-wider mb-1">Container for</p>
+                <div className="flex flex-wrap gap-2">
+                  {asset.containerFor.map((k: any) => (
+                    <Link key={k.id} href={`/kits/${k.id}`}
+                      className="text-sm text-zinc-300 hover:text-white hover:underline">
+                      {k.name} <span className="text-zinc-600">({k.kitCode})</span>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
+            {(asset.kitItems?.length ?? 0) > 0 && (
+              <div>
+                <p className="text-xs text-zinc-500 uppercase tracking-wider mb-1">In kits</p>
+                <div className="flex flex-wrap gap-2">
+                  {asset.kitItems.map((ki: any) => (
+                    <Link key={ki.kitId} href={`/kits/${ki.kitId}`}
+                      className="text-sm text-zinc-300 hover:text-white hover:underline">
+                      {ki.kit.name} <span className="text-zinc-600">({ki.kit.kitCode})</span>
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         <AssetExtras
           assignee={asset.assignee}

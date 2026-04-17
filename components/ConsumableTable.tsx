@@ -112,8 +112,8 @@ export default function ConsumableTable({ consumables, locations, canEdit }: { c
           </button>
         ))}
       </div>
-      <div className="mb-4">
-        <SearchBar value={search} onChange={setSearch} />
+      <div className="mb-4 w-full">
+        <SearchBar value={search} onChange={setSearch} showScan={false} className="w-full" />
       </div>
 
       <form action={deleteAction} onSubmit={handleDeleteSubmit}>

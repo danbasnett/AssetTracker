@@ -365,6 +365,36 @@ export async function updateLocation(prevState: any, formData: FormData) {
   return { success: true }
 }
 
+export async function reparentLocation(id: number, newParentId: number | null) {
+  const session = await requireAuth()
+  if (!hasRole(session.role, 'ASSET_CONTROL')) return { error: 'Insufficient permissions' }
+
+  function getDescendantIds(rootId: number, all: { id: number; parentId: number | null }[]): Set<number> {
+    const result = new Set<number>()
+    const queue = [rootId]
+    while (queue.length) {
+      const cur = queue.shift()!
+      for (const l of all) {
+        if (l.parentId === cur && !result.has(l.id)) { result.add(l.id); queue.push(l.id) }
+      }
+    }
+    return result
+  }
+
+  if (newParentId !== null) {
+    const all = await prisma.location.findMany({ select: { id: true, parentId: true } })
+    const descendants = getDescendantIds(id, all)
+    if (descendants.has(newParentId) || newParentId === id) return { error: 'Cannot move a location into its own descendant' }
+  }
+
+  await prisma.location.update({
+    where: { id },
+    data: { parentId: newParentId }
+  })
+  revalidatePath('/locations')
+  return { success: true }
+}
+
 export async function updateLocationDetails(prevState: any, formData: FormData) {
   const session = await requireAuth()
   if (!hasRole(session.role, 'ASSET_CONTROL')) return { error: 'Insufficient permissions' }
@@ -483,6 +513,90 @@ export async function addConsumable(prevState: any, formData: FormData) {
 
   await audit(session.userId, session.username, 'CREATE', 'Consumable', undefined, name, { name, quantity: parseInt(quantity)||0, unit: unit||'each', reorderPoint: parseInt(reorderPoint)||5, modelNumber: modelNumber||null, locationId: locationId||null })
   revalidatePath('/items')
+  return { success: true }
+}
+
+export async function createKit(data: { name: string; kitCode: string }) {
+  const session = await requireAuth()
+  if (!hasRole(session.role, 'ASSET_CONTROL')) return { error: 'Insufficient permissions' }
+
+  const { name, kitCode } = data
+  if (!name?.trim()) return { error: 'Kit name is required' }
+  if (!kitCode?.trim()) return { error: 'Kit ID is required' }
+
+  let kit: any
+  try {
+    kit = await (prisma as any).kit.create({ data: { name: name.trim(), kitCode: kitCode.trim() } })
+  } catch (e: any) {
+    if (e.code === 'P2002') return { error: `Kit ID "${kitCode}" is already in use` }
+    return { error: 'Something went wrong' }
+  }
+
+  await audit(session.userId, session.username, 'CREATE', 'Kit', kit.id, name, { kitCode })
+  revalidatePath('/kits')
+  return { success: true, id: kit.id }
+}
+
+export async function updateKit(id: number, data: { name?: string; kitCode?: string }) {
+  const session = await requireAuth()
+  if (!hasRole(session.role, 'ASSET_CONTROL')) return { error: 'Insufficient permissions' }
+
+  try {
+    await (prisma as any).kit.update({ where: { id }, data })
+  } catch (e: any) {
+    if (e.code === 'P2002') return { error: `Kit ID "${data.kitCode}" is already in use` }
+    return { error: 'Something went wrong' }
+  }
+
+  await audit(session.userId, session.username, 'UPDATE', 'Kit', id, data.name, {})
+  revalidatePath('/kits')
+  revalidatePath(`/kits/${id}`)
+  return { success: true }
+}
+
+export async function deleteKit(id: number) {
+  const session = await requireAuth()
+  if (!hasRole(session.role, 'ASSET_CONTROL')) return { error: 'Insufficient permissions' }
+
+  const kit = await (prisma as any).kit.findUnique({ where: { id }, select: { name: true } })
+  if (!kit) return { error: 'Kit not found' }
+
+  await (prisma as any).kit.delete({ where: { id } })
+  await audit(session.userId, session.username, 'DELETE', 'Kit', id, kit.name, {})
+  revalidatePath('/kits')
+  return { success: true }
+}
+
+export async function setKitContainer(kitId: number, containerId: number | null) {
+  const session = await requireAuth()
+  if (!hasRole(session.role, 'ASSET_CONTROL')) return { error: 'Insufficient permissions' }
+
+  await (prisma as any).kit.update({ where: { id: kitId }, data: { containerId } })
+  revalidatePath(`/kits/${kitId}`)
+  return { success: true }
+}
+
+export async function addAssetToKit(kitId: number, assetId: number) {
+  const session = await requireAuth()
+  if (!hasRole(session.role, 'ASSET_CONTROL')) return { error: 'Insufficient permissions' }
+
+  try {
+    await (prisma as any).kitItem.create({ data: { kitId, assetId } })
+  } catch (e: any) {
+    if (e.code === 'P2002') return { error: 'Asset is already in this kit' }
+    return { error: 'Something went wrong' }
+  }
+
+  revalidatePath(`/kits/${kitId}`)
+  return { success: true }
+}
+
+export async function removeAssetFromKit(kitId: number, assetId: number) {
+  const session = await requireAuth()
+  if (!hasRole(session.role, 'ASSET_CONTROL')) return { error: 'Insufficient permissions' }
+
+  await (prisma as any).kitItem.delete({ where: { kitId_assetId: { kitId, assetId } } })
+  revalidatePath(`/kits/${kitId}`)
   return { success: true }
 }
 
@@ -1303,13 +1417,62 @@ export async function addPlanItem(prevState: any, formData: FormData) {
   const modelNumber = (formData.get('modelNumber') as string)?.trim() || null
   const quantity = Math.max(1, parseInt((formData.get('quantity') as string) || '1'))
   const notes = (formData.get('notes') as string)?.trim() || null
+  const kitId = formData.get('kitId') ? parseInt(formData.get('kitId') as string) : null
 
   await (prisma as any).allocationPlanItem.create({
-    data: { allocationId, description, modelNumber, quantity, notes }
+    data: { allocationId, description, modelNumber, quantity, notes, kitId }
   })
 
   revalidatePath(`/allocations/${allocationId}`)
   return { success: true }
+}
+
+export async function addKitPlanItem(allocationId: number, kitId: number) {
+  const session = await requireAuth()
+  if (!hasRole(session.role, 'MANAGEMENT')) return { error: 'Insufficient permissions' }
+
+  const kit = await (prisma as any).kit.findUnique({
+    where: { id: kitId },
+    include: { items: true },
+  })
+  if (!kit) return { error: 'Kit not found' }
+
+  await (prisma as any).allocationPlanItem.create({
+    data: { allocationId, description: kit.name, quantity: 1, kitId }
+  })
+
+  revalidatePath(`/allocations/${allocationId}`)
+  return { success: true }
+}
+
+export async function addKitToAllocationCheckout(allocationId: number, kitId: number) {
+  const session = await requireAuth()
+  if (!hasRole(session.role, 'MANAGEMENT')) return { error: 'Insufficient permissions' }
+
+  const kit = await (prisma as any).kit.findUnique({
+    where: { id: kitId },
+    include: { items: { select: { assetId: true } } },
+  })
+  if (!kit) return { error: 'Kit not found' }
+
+  const allocation = await (prisma as any).allocation.findUnique({
+    where: { id: allocationId },
+    include: { assets: { select: { id: true } } },
+  })
+  if (!allocation) return { error: 'Allocation not found' }
+
+  const existingIds = new Set(allocation.assets.map((a: any) => a.id))
+  const toAdd = kit.items.map((i: any) => i.assetId).filter((id: number) => !existingIds.has(id))
+
+  if (toAdd.length === 0) return { success: true, added: 0 }
+
+  await (prisma as any).allocation.update({
+    where: { id: allocationId },
+    data: { assets: { connect: toAdd.map((id: number) => ({ id })) } },
+  })
+
+  revalidatePath(`/allocations/${allocationId}`)
+  return { success: true, added: toAdd.length }
 }
 
 export async function updatePlanItem(prevState: any, formData: FormData) {

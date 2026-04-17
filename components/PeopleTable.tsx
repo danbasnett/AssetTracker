@@ -19,6 +19,7 @@ export default function PeopleTable({ people, canEdit }: { people: Person[]; can
   const [deletingId, setDeletingId] = useState<number | null>(null)
   const [sortKey, setSortKey] = useState('name')
   const [sortDir, setSortDir] = useState<SortDir>('asc')
+  const [search, setSearch] = useState('')
 
   function toggleSort(key: string) {
     if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
@@ -26,7 +27,11 @@ export default function PeopleTable({ people, canEdit }: { people: Person[]; can
   }
 
   const sorted = sortRows(
-    people.map(p => ({ ...p, assets: p._count.assets })),
+    people
+      .filter(p => !search || p.name.toLowerCase().includes(search.toLowerCase()) ||
+        (p.department ?? '').toLowerCase().includes(search.toLowerCase()) ||
+        (p.email ?? '').toLowerCase().includes(search.toLowerCase()))
+      .map(p => ({ ...p, assets: p._count.assets })),
     sortKey, sortDir
   )
 
@@ -43,6 +48,8 @@ export default function PeopleTable({ people, canEdit }: { people: Person[]; can
 
   return (
     <div className="space-y-6">
+      <input type="search" placeholder="Search people…" value={search} onChange={e => setSearch(e.target.value)}
+        className="w-full rounded-xl bg-zinc-800 px-4 py-2.5 text-white placeholder-zinc-500 border border-zinc-700 focus:outline-none focus:border-zinc-500 text-sm" />
       <div className="rounded-2xl border border-zinc-800 bg-zinc-900 overflow-hidden">
         {people.length === 0 ? (
           <p className="p-6 text-zinc-400">No people added yet.</p>

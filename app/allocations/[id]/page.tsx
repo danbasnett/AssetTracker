@@ -10,16 +10,23 @@ export default async function AllocationDetailPage({ params }: { params: Promise
   const session = await requireAuth()
   const canManage = hasRole(session.role, 'MANAGEMENT')
 
-  const [allocation, allAssets, templates] = await Promise.all([
+  const [allocation, allAssets, templates, allKits] = await Promise.all([
     (prisma as any).allocation.findUnique({
       where: { id: parseInt(id) },
       include: {
         assets: { include: { location: true }, orderBy: { name: 'asc' } },
-        planItems: { orderBy: { createdAt: 'asc' } },
+        planItems: {
+          orderBy: { createdAt: 'asc' },
+          include: { kit: { include: { items: { include: { asset: { select: { id: true } } } } } } },
+        },
       }
     }),
     prisma.asset.findMany({ orderBy: { name: 'asc' } }),
     (prisma as any).modelTemplate.findMany({ orderBy: { name: 'asc' } }),
+    (prisma as any).kit.findMany({
+      orderBy: { name: 'asc' },
+      include: { items: { include: { asset: { select: { id: true, name: true, assetTag: true } } } } },
+    }),
   ])
 
   if (!allocation) notFound()
@@ -32,7 +39,7 @@ export default async function AllocationDetailPage({ params }: { params: Promise
         </Link>
         <AllocationDetailHeader allocation={allocation} canManage={canManage} />
 
-        <AllocationDetail allocation={allocation} allAssets={allAssets} canManage={canManage} templates={templates} />
+        <AllocationDetail allocation={allocation} allAssets={allAssets} canManage={canManage} templates={templates} allKits={allKits} />
       </div>
     </main>
   )

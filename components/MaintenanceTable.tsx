@@ -112,6 +112,7 @@ export default function MaintenanceTable({
   const [createState, createAction] = useActionState(createMaintenance, null)
   const [updateState, updateAction] = useActionState(updateMaintenance, null)
   const [, startTransition] = useTransition()
+  const [search, setSearch] = useState('')
   const [filters, setFilters] = useState<Set<string>>(new Set())
   const [editingId, setEditingId] = useState<number | null>(null)
   const [editValues, setEditValues] = useState<Partial<MaintenanceRecord & { assetId: number }>>({})
@@ -142,8 +143,17 @@ export default function MaintenanceTable({
     })
   }
 
+  function matchesSearch(r: MaintenanceRecord) {
+    if (!search) return true
+    const q = search.toLowerCase()
+    return r.title.toLowerCase().includes(q) ||
+      r.asset.name.toLowerCase().includes(q) ||
+      r.asset.assetTag.toLowerCase().includes(q) ||
+      (r.description ?? '').toLowerCase().includes(q)
+  }
+
   function matchesFilter(r: MaintenanceRecord) {
-    return filters.size === 0 || filters.has(r.status)
+    return (filters.size === 0 || filters.has(r.status)) && matchesSearch(r)
   }
 
   function startEdit(r: MaintenanceRecord) {
@@ -376,6 +386,10 @@ export default function MaintenanceTable({
           </div>
         </div>
       )}
+
+      {/* Search */}
+      <input type="search" placeholder="Search maintenance records…" value={search} onChange={e => setSearch(e.target.value)}
+        className="w-full rounded-xl bg-zinc-800 px-4 py-2.5 text-white placeholder-zinc-500 border border-zinc-700 focus:outline-none focus:border-zinc-500 text-sm" />
 
       {/* Filter tabs */}
       <div className="flex gap-1 flex-wrap">

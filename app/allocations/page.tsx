@@ -28,7 +28,7 @@ export default async function AllocationsPage() {
           )}
         </div>
 
-        <div className="mt-6 rounded-2xl border border-zinc-800 bg-zinc-900 overflow-hidden">
+        <div className="mt-6">
           <AllocationTable allocations={allocations} canManage={canManage} />
         </div>
       </div>

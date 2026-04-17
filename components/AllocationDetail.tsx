@@ -1,9 +1,9 @@
 'use client'
 
 import { useState, useTransition, useRef, useEffect, lazy, Suspense } from 'react'
-import { addAssetToAllocation, removeAssetFromAllocation } from '../app/actions'
+import { addAssetToAllocation, removeAssetFromAllocation, addKitToAllocationCheckout } from '../app/actions'
 import Link from 'next/link'
-import { ScanLine, Check, X as XIcon } from 'lucide-react'
+import { ScanLine, Check, X as XIcon, Boxes, ChevronDown } from 'lucide-react'
 import AllocationPlan from './AllocationPlan'
 
 const BarcodeScanner = lazy(() => import('./BarcodeScanner'))
@@ -24,7 +24,11 @@ type PlanItem = {
   modelNumber: string | null
   quantity: number
   notes: string | null
+  kitId: number | null
+  kit: { id: number; name: string; kitCode: string; items: { asset: { id: number } }[] } | null
 }
+
+type KitOption = { id: number; name: string; kitCode: string; items: { asset: { id: number; name: string; assetTag: string } }[] }
 
 type Template = {
   id: number
@@ -51,7 +55,58 @@ type ScanConfirm = {
   action: Mode
 }
 
-export default function AllocationDetail({ allocation, allAssets, canManage, templates }: { allocation: Allocation; allAssets: Asset[]; canManage: boolean; templates: Template[] }) {
+function KitCheckoutPicker({ kits, allocationId, isPending, onDone }: { kits: KitOption[]; allocationId: number; isPending: boolean; onDone: (added: number) => void }) {
+  const [q, setQ] = useState('')
+  const [open, setOpen] = useState(false)
+  const [, startTransition] = useTransition()
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function down(e: MouseEvent) { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false) }
+    document.addEventListener('mousedown', down)
+    return () => document.removeEventListener('mousedown', down)
+  }, [])
+
+  const filtered = kits.filter(k => !q || k.name.toLowerCase().includes(q.toLowerCase()) || k.kitCode.toLowerCase().includes(q.toLowerCase()))
+
+  function pick(kitId: number) {
+    setOpen(false); setQ('')
+    startTransition(async () => {
+      const result = await addKitToAllocationCheckout(allocationId, kitId)
+      onDone((result as any)?.added ?? 0)
+    })
+  }
+
+  return (
+    <div ref={ref} className="relative">
+      <button type="button" onClick={() => setOpen(o => !o)} disabled={isPending}
+        className="flex items-center gap-1.5 rounded-xl bg-zinc-800 border border-zinc-700 px-3 py-2 text-sm text-zinc-400 hover:text-white hover:border-zinc-500 transition-colors disabled:opacity-50">
+        <Boxes size={16} /> Add kit
+        <ChevronDown size={12} className="text-zinc-500" />
+      </button>
+      {open && (
+        <div className="absolute z-50 mt-1 w-64 rounded-xl border border-zinc-700 bg-zinc-900 shadow-2xl">
+          <div className="p-2 border-b border-zinc-800">
+            <input autoFocus value={q} onChange={e => setQ(e.target.value)} placeholder="Search kits…"
+              className="w-full bg-zinc-800 rounded-lg px-3 py-1.5 text-xs text-white placeholder-zinc-500 focus:outline-none" />
+          </div>
+          <div className="max-h-52 overflow-y-auto py-1">
+            {filtered.map(k => (
+              <button key={k.id} type="button" onClick={() => pick(k.id)}
+                className="w-full flex items-center justify-between gap-2 px-3 py-2 text-xs text-left hover:bg-zinc-800">
+                <span className="text-zinc-200 truncate">{k.name}</span>
+                <span className="text-zinc-600 flex-shrink-0">{k.kitCode} · {k.items.length} items</span>
+              </button>
+            ))}
+            {filtered.length === 0 && <p className="px-3 py-2 text-xs text-zinc-500">No kits found</p>}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+export default function AllocationDetail({ allocation, allAssets, canManage, templates, allKits = [] }: { allocation: Allocation; allAssets: Asset[]; canManage: boolean; templates: Template[]; allKits?: KitOption[] }) {
   const [mode, setMode] = useState<Mode>('assign')
   const [query, setQuery] = useState('')
   const [showSuggestions, setShowSuggestions] = useState(false)
@@ -215,6 +270,7 @@ export default function AllocationDetail({ allocation, allAssets, canManage, tem
       planItems={allocation.planItems}
       assignedAssets={allocation.assets}
       templates={templates}
+      kits={allKits}
       canManage={canManage}
     />
 
@@ -287,6 +343,14 @@ export default function AllocationDetail({ allocation, allAssets, canManage, tem
             >
               <ScanLine size={16} /> Scan
             </button>
+            {allKits.length > 0 && (
+              <KitCheckoutPicker
+                kits={allKits}
+                allocationId={allocation.id}
+                isPending={isPending}
+                onDone={() => {}}
+              />
+            )}
           </div>
 
           {/* Search input */}

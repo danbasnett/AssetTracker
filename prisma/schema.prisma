@@ -45,6 +45,8 @@ model Asset {
   value        Float?
   notes        String?
   createdAt    DateTime      @default(now())
+  containerFor Kit[]         @relation("KitContainer")
+  kitItems     KitItem[]
   allocations  Allocation[]  @relation("AllocationAssets")
   maintenance  Maintenance[]
   photos       AssetPhoto[]
@@ -121,6 +123,8 @@ model AllocationPlanItem {
   modelNumber  String?
   quantity     Int        @default(1)
   notes        String?
+  kitId        Int?
+  kit          Kit?       @relation(fields: [kitId], references: [id], onDelete: SetNull)
   createdAt    DateTime   @default(now())
 }
 
@@ -196,6 +200,25 @@ model ModelTemplate {
   location    Location? @relation(fields: [locationId], references: [id], onDelete: SetNull)
   notes       String?
   createdAt   DateTime @default(now())
+}
+
+model Kit {
+  id          Int                  @id @default(autoincrement())
+  name        String
+  kitCode     String               @unique
+  containerId Int?
+  container   Asset?               @relation("KitContainer", fields: [containerId], references: [id], onDelete: SetNull)
+  items       KitItem[]
+  planItems   AllocationPlanItem[]
+  createdAt   DateTime             @default(now())
+}
+
+model KitItem {
+  kitId   Int
+  assetId Int
+  kit     Kit   @relation(fields: [kitId], references: [id], onDelete: Cascade)
+  asset   Asset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  @@id([kitId, assetId])
 }
 
 model AuditLog {
