@@ -955,6 +955,48 @@ export async function deleteAllData() {
   return { success: true }
 }
 
+// ── SSO / OAuth Providers ─────────────────────────────────────────────────────
+
+export async function upsertOAuthProvider(prevState: any, formData: FormData) {
+  const session = await requireAuth()
+  if (!hasRole(session.role, 'ADMIN')) return { error: 'Insufficient permissions' }
+
+  const name = formData.get('name') as string
+  const label = formData.get('label') as string
+  const clientId = (formData.get('clientId') as string).trim()
+  const clientSecret = (formData.get('clientSecret') as string).trim()
+  const defaultRole = (formData.get('defaultRole') as string) || 'VIEW_ONLY'
+  const enabled = formData.get('enabled') === 'true'
+  const appleTeamId = (formData.get('appleTeamId') as string)?.trim() || null
+  const appleKeyId = (formData.get('appleKeyId') as string)?.trim() || null
+  const applePrivKey = (formData.get('applePrivKey') as string)?.trim() || null
+  const authUrl = (formData.get('authUrl') as string)?.trim() || null
+  const tokenUrl = (formData.get('tokenUrl') as string)?.trim() || null
+  const userinfoUrl = (formData.get('userinfoUrl') as string)?.trim() || null
+  const scope = (formData.get('scope') as string)?.trim() || null
+
+  if (!clientId || !clientSecret) return { error: 'Client ID and Client Secret are required' }
+
+  await (prisma as any).oAuthProvider.upsert({
+    where: { name },
+    update: { label, clientId, clientSecret, defaultRole, enabled, appleTeamId, appleKeyId, applePrivKey, authUrl, tokenUrl, userinfoUrl, scope },
+    create: { name, label, clientId, clientSecret, defaultRole, enabled, appleTeamId, appleKeyId, applePrivKey, authUrl, tokenUrl, userinfoUrl, scope },
+  })
+
+  revalidatePath('/settings')
+  return { success: true }
+}
+
+export async function deleteOAuthProvider(prevState: any, formData: FormData) {
+  const session = await requireAuth()
+  if (!hasRole(session.role, 'ADMIN')) return { error: 'Insufficient permissions' }
+
+  const name = formData.get('name') as string
+  await (prisma as any).oAuthProvider.delete({ where: { name } })
+  revalidatePath('/settings')
+  return { success: true }
+}
+
 // ── CSV Import ────────────────────────────────────────────────────────────────
 
 function parseCSV(text: string): Record<string, string>[] {

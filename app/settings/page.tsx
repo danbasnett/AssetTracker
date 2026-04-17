@@ -6,14 +6,16 @@ import SettingsLogoUpload from '../../components/SettingsLogoUpload'
 import SettingsDeleteAll from '../../components/SettingsDeleteAll'
 import SettingsImport from '../../components/SettingsImport'
 import SettingsExport from '../../components/SettingsExport'
+import SettingsSso from '../../components/SettingsSso'
 
 export default async function SettingsPage() {
   const session = await requireRole('ADMIN')
 
-  const [statuses, users, logoSetting] = await Promise.all([
+  const [statuses, users, logoSetting, ssoProviders] = await Promise.all([
     prisma.status.findMany({ orderBy: { name: 'asc' } }),
     prisma.user.findMany({ orderBy: { username: 'asc' } }),
-    prisma.setting.findUnique({ where: { key: 'logoPath' } })
+    prisma.setting.findUnique({ where: { key: 'logoPath' } }),
+    (prisma as any).oAuthProvider.findMany({ orderBy: { createdAt: 'asc' } }),
   ])
 
   return (
@@ -25,6 +27,11 @@ export default async function SettingsPage() {
         <div className="mt-8">
           <h2 className="text-sm font-medium text-zinc-400 uppercase tracking-wider mb-3">Logo</h2>
           <SettingsLogoUpload currentLogoUrl={logoSetting?.value} />
+        </div>
+
+        <div className="mt-10">
+          <h2 className="text-sm font-medium text-zinc-400 uppercase tracking-wider mb-3">Single Sign-On (OAuth)</h2>
+          <SettingsSso providers={ssoProviders} />
         </div>
 
         <div className="mt-10">

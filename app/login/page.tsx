@@ -8,10 +8,11 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
   if (session.isLoggedIn) redirect('/')
 
   const { from } = await searchParams
-  const [userCount, logoSetting] = await Promise.all([
+  const [userCount, logoSetting, ssoProviders] = await Promise.all([
     prisma.user.count(),
     prisma.setting.findUnique({ where: { key: 'logoPath' } }).catch(() => null),
+    (prisma as any).oAuthProvider.findMany({ where: { enabled: true }, orderBy: { createdAt: 'asc' } }).catch(() => []),
   ])
 
-  return <LoginForm isFirstTime={userCount === 0} from={from ?? '/'} logoUrl={logoSetting?.value ?? undefined} />
+  return <LoginForm isFirstTime={userCount === 0} from={from ?? '/'} logoUrl={logoSetting?.value ?? undefined} ssoProviders={ssoProviders} />
 }

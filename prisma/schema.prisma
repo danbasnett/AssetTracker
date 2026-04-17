@@ -112,11 +112,32 @@ enum Role {
 model User {
   id           Int       @id @default(autoincrement())
   username     String    @unique
-  passwordHash String
+  email        String?   @unique
+  passwordHash String    @default("*")
   role         Role      @default(ADMIN)
   avatarPath   String?
   createdAt    DateTime  @default(now())
   lastLoginAt  DateTime?
+}
+
+model OAuthProvider {
+  id           Int      @id @default(autoincrement())
+  name         String   @unique
+  label        String
+  clientId     String
+  clientSecret String
+  enabled      Boolean  @default(true)
+  defaultRole  Role     @default(VIEW_ONLY)
+  // Custom OAuth2/OIDC endpoints (used when name is not google/apple)
+  authUrl      String?
+  tokenUrl     String?
+  userinfoUrl  String?
+  scope        String?
+  // Apple-specific
+  appleTeamId  String?
+  appleKeyId   String?
+  applePrivKey String?
+  createdAt    DateTime @default(now())
 }
 
 model Setting {
