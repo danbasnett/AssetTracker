@@ -5,9 +5,10 @@ import NewAssetForm from '../../../components/NewAssetForm'
 
 export default async function NewAssetPage() {
   await requireRole('ASSET_CONTROL')
-  const [locations, statuses] = await Promise.all([
+  const [locations, statuses, templates] = await Promise.all([
     prisma.location.findMany({ orderBy: { name: 'asc' } }),
-    prisma.status.findMany({ orderBy: { name: 'asc' } })
+    prisma.status.findMany({ orderBy: { name: 'asc' } }),
+    (prisma as any).modelTemplate.findMany({ orderBy: { name: 'asc' } }),
   ])
 
   return (
@@ -17,7 +18,7 @@ export default async function NewAssetPage() {
           ← Back to Assets
         </Link>
         <h1 className="mt-4 text-3xl font-semibold">Add Asset</h1>
-        <NewAssetForm locations={locations} statuses={statuses} />
+        <NewAssetForm locations={locations} statuses={statuses} templates={templates} />
       </div>
     </main>
   )

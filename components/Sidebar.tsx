@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useSidebar } from './SidebarContext'
-import { Home, Package, MapPin, ChevronLeft, ChevronRight, Table, Settings, ClipboardList, LogOut, Users, Wrench, ScrollText } from 'lucide-react'
+import { Home, Package, MapPin, ChevronLeft, ChevronRight, Table, Settings, ClipboardList, LogOut, Users, Wrench, ScrollText, LayoutTemplate } from 'lucide-react'
 import { useTransition } from 'react'
 import { logout } from '../app/actions'
 import type { Role } from '../lib/session'
@@ -31,6 +31,7 @@ export default function Sidebar({ logoUrl, userRole, username, avatarUrl }: { lo
     { href: '/allocations', label: 'Allocations', icon: ClipboardList },
     { href: '/people', label: 'People', icon: Users },
     { href: '/maintenance', label: 'Maintenance', icon: Wrench },
+    { href: '/models', label: 'Models', icon: LayoutTemplate },
   ]
 
   const navLinkClass = (href: string) =>

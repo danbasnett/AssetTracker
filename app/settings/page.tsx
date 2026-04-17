@@ -8,8 +8,18 @@ import SettingsImport from '../../components/SettingsImport'
 import SettingsExport from '../../components/SettingsExport'
 import SettingsSso from '../../components/SettingsSso'
 
+const DEFAULT_STATUSES = ['Assigned', 'Available', 'Checked Out', 'Repair Needed', 'Retired', 'Booked']
+
 export default async function SettingsPage() {
   const session = await requireRole('ADMIN')
+
+  // Ensure default statuses exist
+  const existing = await prisma.status.findMany({ select: { name: true } })
+  const existingNames = new Set(existing.map(s => s.name))
+  const missing = DEFAULT_STATUSES.filter(n => !existingNames.has(n))
+  if (missing.length > 0) {
+    await prisma.status.createMany({ data: missing.map(name => ({ name })) })
+  }
 
   const [statuses, users, logoSetting, ssoProviders] = await Promise.all([
     prisma.status.findMany({ orderBy: { name: 'asc' } }),

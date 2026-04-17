@@ -201,7 +201,7 @@ export default function AllocationDetail({ allocation, allAssets, canManage }: {
           ) : (
             allocation.assets.map(asset => (
               <div key={asset.id} className="flex items-center justify-between px-6 py-4 gap-4">
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                   <Link href={`/assets/${asset.id}`} className="font-medium hover:underline">
                     {asset.name}
                   </Link>
@@ -211,6 +211,22 @@ export default function AllocationDetail({ allocation, allAssets, canManage }: {
                   </p>
                 </div>
                 <span className="text-xs text-zinc-400 shrink-0">{asset.status}</span>
+                {canManage && (
+                  <button
+                    type="button"
+                    disabled={isPending}
+                    onClick={() => {
+                      setError(null)
+                      startTransition(async () => {
+                        const result: any = await removeAssetFromAllocation(allocation.id, asset.id)
+                        if (result?.error) setError(result.error)
+                      })
+                    }}
+                    className="shrink-0 rounded-lg bg-zinc-800 px-3 py-1 text-zinc-400 text-xs hover:bg-red-900 hover:text-red-300 disabled:opacity-50"
+                  >
+                    Remove
+                  </button>
+                )}
               </div>
             ))
           )}

@@ -650,11 +650,15 @@ export async function addStatus(prevState: any, formData: FormData) {
   return { success: true }
 }
 
+const DEFAULT_STATUSES = ['Assigned', 'Available', 'Checked Out', 'Repair Needed', 'Retired', 'Booked']
+
 export async function deleteStatus(prevState: any, formData: FormData) {
   const session = await requireAuth()
   if (!hasRole(session.role, 'ADMIN')) return { error: 'Insufficient permissions' }
 
   const id = formData.get('id') as string
+  const existing = await prisma.status.findUnique({ where: { id: parseInt(id) } })
+  if (existing && DEFAULT_STATUSES.includes(existing.name)) return { error: 'Default statuses cannot be deleted' }
 
   await prisma.status.delete({ where: { id: parseInt(id) } })
 
@@ -1203,4 +1207,47 @@ export async function importPeople(prevState: any, formData: FormData) {
   await audit(session.userId, session.username, 'IMPORT', 'Person', undefined, undefined, `Imported ${imported}, skipped ${skipped}`)
   revalidatePath('/people')
   return { success: true, imported, skipped, errors }
+}
+
+// ── Model Templates ──────────────────────────────────────────────────────────
+
+export async function upsertModelTemplate(prevState: any, formData: FormData) {
+  const session = await requireAuth()
+  if (!hasRole(session.role, 'ASSET_CONTROL')) return { error: 'Insufficient permissions' }
+
+  const id = formData.get('id') as string | null
+  const name = (formData.get('name') as string)?.trim()
+  if (!name) return { error: 'Name is required' }
+
+  const modelNumber = (formData.get('modelNumber') as string)?.trim() || null
+  const supplier = (formData.get('supplier') as string)?.trim() || null
+  const valueRaw = formData.get('value') as string
+  const value = valueRaw ? parseFloat(valueRaw) : null
+  const locationIdRaw = formData.get('locationId') as string
+  const locationId = locationIdRaw ? parseInt(locationIdRaw) : null
+  const notes = (formData.get('notes') as string)?.trim() || null
+
+  const data = { name, modelNumber, supplier, value, locationId, notes }
+
+  try {
+    if (id) {
+      await (prisma as any).modelTemplate.update({ where: { id: parseInt(id) }, data })
+    } else {
+      await (prisma as any).modelTemplate.create({ data })
+    }
+  } catch (e: any) {
+    if (e.code === 'P2002') return { error: `A template named "${name}" already exists` }
+    throw e
+  }
+
+  revalidatePath('/models')
+  return { success: true }
+}
+
+export async function deleteModelTemplate(id: number) {
+  const session = await requireAuth()
+  if (!hasRole(session.role, 'ASSET_CONTROL')) return { error: 'Insufficient permissions' }
+  await (prisma as any).modelTemplate.delete({ where: { id } })
+  revalidatePath('/models')
+  return { success: true }
 }

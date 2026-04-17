@@ -15,8 +15,9 @@ model Location {
   parent      Location?    @relation("LocationChildren", fields: [parentId], references: [id])
   children    Location[]   @relation("LocationChildren")
   createdAt   DateTime     @default(now())
-  assets      Asset[]
-  consumables Consumable[]
+  assets          Asset[]
+  consumables     Consumable[]
+  modelTemplates  ModelTemplate[]
 }
 
 model AssetPhoto {
@@ -152,6 +153,18 @@ model OAuthProvider {
 model Setting {
   key   String @id
   value String
+}
+
+model ModelTemplate {
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  modelNumber String?
+  supplier    String?
+  value       Float?
+  locationId  Int?
+  location    Location? @relation(fields: [locationId], references: [id], onDelete: SetNull)
+  notes       String?
+  createdAt   DateTime @default(now())
 }
 
 model AuditLog {

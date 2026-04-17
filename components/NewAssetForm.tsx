@@ -1,24 +1,78 @@
 'use client'
 
-import { useActionState, useEffect, useState } from 'react'
+import { useActionState, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ScanLine } from 'lucide-react'
+import { ScanLine, LayoutTemplate, X } from 'lucide-react'
 import dynamic from 'next/dynamic'
 import { addAsset } from '../app/actions'
 const BarcodeScanner = dynamic(() => import('./BarcodeScanner'), { ssr: false })
 
 type Location = { id: number; name: string }
 type Status = { id: number; name: string }
+type Template = {
+  id: number
+  name: string
+  modelNumber: string | null
+  supplier: string | null
+  value: number | null
+  locationId: number | null
+  notes: string | null
+}
 
-export default function NewAssetForm({ locations, statuses }: { locations: Location[]; statuses: Status[] }) {
+export default function NewAssetForm({ locations, statuses, templates }: { locations: Location[]; statuses: Status[]; templates: Template[] }) {
   const [state, formAction] = useActionState(addAsset, null)
   const [assetTag, setAssetTag] = useState('')
   const [scanning, setScanning] = useState(false)
   const router = useRouter()
 
+  // Template search state
+  const [templateQuery, setTemplateQuery] = useState('')
+  const [showTemplateSuggestions, setShowTemplateSuggestions] = useState(false)
+  const [appliedTemplate, setAppliedTemplate] = useState<Template | null>(null)
+  const templateContainerRef = useRef<HTMLDivElement>(null)
+
+  // Controlled fields populated by template
+  const [name, setName] = useState('')
+  const [modelNumber, setModelNumber] = useState('')
+  const [supplier, setSupplier] = useState('')
+  const [value, setValue] = useState('')
+  const [locationId, setLocationId] = useState('')
+  const [notes, setNotes] = useState('')
+
   useEffect(() => {
     if (state?.success) router.push('/assets')
   }, [state])
+
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (templateContainerRef.current && !templateContainerRef.current.contains(e.target as Node)) {
+        setShowTemplateSuggestions(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  const templateSuggestions = templates.filter(t =>
+    !templateQuery || t.name.toLowerCase().includes(templateQuery.toLowerCase())
+  ).slice(0, 8)
+
+  function applyTemplate(t: Template) {
+    setAppliedTemplate(t)
+    setTemplateQuery(t.name)
+    setShowTemplateSuggestions(false)
+    if (t.name) setName(t.name)
+    if (t.modelNumber) setModelNumber(t.modelNumber)
+    if (t.supplier) setSupplier(t.supplier)
+    if (t.value != null) setValue(String(t.value))
+    if (t.locationId) setLocationId(String(t.locationId))
+    if (t.notes) setNotes(t.notes)
+  }
+
+  function clearTemplate() {
+    setAppliedTemplate(null)
+    setTemplateQuery('')
+  }
 
   return (
     <>
@@ -33,12 +87,58 @@ export default function NewAssetForm({ locations, statuses }: { locations: Locat
         <p className="text-red-400 text-sm">{state.error}</p>
       )}
 
+      {/* Template picker */}
+      <div>
+        <h2 className="text-sm font-medium text-zinc-400 uppercase tracking-wider mb-3">Template</h2>
+        <div ref={templateContainerRef} className="relative">
+          <div className="flex items-center gap-2 rounded-2xl border border-zinc-800 bg-zinc-900 px-6 py-4">
+            <LayoutTemplate size={16} className="text-zinc-500 shrink-0" />
+            <input
+              type="text"
+              value={templateQuery}
+              onChange={e => { setTemplateQuery(e.target.value); setShowTemplateSuggestions(true) }}
+              onFocus={() => setShowTemplateSuggestions(true)}
+              placeholder="Search templates to auto-fill fields…"
+              className="flex-1 bg-transparent text-white placeholder-zinc-500 text-sm focus:outline-none"
+            />
+            {appliedTemplate && (
+              <button type="button" onClick={clearTemplate} className="text-zinc-500 hover:text-white">
+                <X size={14} />
+              </button>
+            )}
+          </div>
+          {showTemplateSuggestions && templateQuery && (
+            <div className="absolute top-full mt-1 left-0 right-0 z-30 rounded-xl border border-zinc-700 bg-zinc-900 shadow-xl overflow-hidden">
+              {templateSuggestions.length === 0 ? (
+                <p className="px-4 py-3 text-sm text-zinc-500">No templates match</p>
+              ) : (
+                templateSuggestions.map(t => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onMouseDown={e => { e.preventDefault(); applyTemplate(t) }}
+                    className="w-full flex items-center justify-between px-4 py-2.5 text-left hover:bg-zinc-800 transition-colors"
+                  >
+                    <span className="text-sm text-white">{t.name}</span>
+                    <span className="text-xs text-zinc-500 ml-3">{t.modelNumber ?? ''}</span>
+                  </button>
+                ))
+              )}
+            </div>
+          )}
+        </div>
+        {appliedTemplate && (
+          <p className="mt-2 text-xs text-zinc-500">Fields pre-filled from template. You can edit them before saving.</p>
+        )}
+      </div>
+
       <div>
         <h2 className="text-sm font-medium text-zinc-400 uppercase tracking-wider mb-3">Basic Info</h2>
         <div className="rounded-2xl border border-zinc-800 bg-zinc-900 divide-y divide-zinc-800">
           <div className="flex items-center px-6 py-4 gap-4">
             <label className="text-zinc-400 w-36 shrink-0">Name <span className="text-red-400">*</span></label>
             <input name="name" required placeholder="e.g. DeWalt Drill"
+              value={name} onChange={e => setName(e.target.value)}
               className="flex-1 rounded-lg bg-zinc-800 px-3 py-2 text-white placeholder-zinc-600 border border-zinc-700 focus:outline-none focus:border-zinc-500" />
           </div>
           <div className="flex items-center px-6 py-4 gap-4">
@@ -64,7 +164,7 @@ export default function NewAssetForm({ locations, statuses }: { locations: Locat
           </div>
           <div className="flex items-center px-6 py-4 gap-4">
             <label className="text-zinc-400 w-36 shrink-0">Location</label>
-            <select name="locationId" defaultValue=""
+            <select name="locationId" value={locationId} onChange={e => setLocationId(e.target.value)}
               className="flex-1 rounded-lg bg-zinc-800 px-3 py-2 text-white border border-zinc-700 focus:outline-none focus:border-zinc-500">
               <option value="">No location</option>
               {locations.map(loc => (
@@ -86,6 +186,7 @@ export default function NewAssetForm({ locations, statuses }: { locations: Locat
           <div className="flex items-center px-6 py-4 gap-4">
             <label className="text-zinc-400 w-36 shrink-0">Model Number</label>
             <input name="modelNumber" placeholder="—"
+              value={modelNumber} onChange={e => setModelNumber(e.target.value)}
               className="flex-1 rounded-lg bg-zinc-800 px-3 py-2 text-white placeholder-zinc-600 border border-zinc-700 focus:outline-none focus:border-zinc-500" />
           </div>
         </div>
@@ -97,6 +198,7 @@ export default function NewAssetForm({ locations, statuses }: { locations: Locat
           <div className="flex items-center px-6 py-4 gap-4">
             <label className="text-zinc-400 w-36 shrink-0">Supplier</label>
             <input name="supplier" placeholder="—"
+              value={supplier} onChange={e => setSupplier(e.target.value)}
               className="flex-1 rounded-lg bg-zinc-800 px-3 py-2 text-white placeholder-zinc-600 border border-zinc-700 focus:outline-none focus:border-zinc-500" />
           </div>
           <div className="flex items-center px-6 py-4 gap-4">
@@ -107,7 +209,19 @@ export default function NewAssetForm({ locations, statuses }: { locations: Locat
           <div className="flex items-center px-6 py-4 gap-4">
             <label className="text-zinc-400 w-36 shrink-0">Value (£)</label>
             <input name="value" type="number" min="0" step="0.01" placeholder="—"
+              value={value} onChange={e => setValue(e.target.value)}
               className="flex-1 rounded-lg bg-zinc-800 px-3 py-2 text-white placeholder-zinc-600 border border-zinc-700 focus:outline-none focus:border-zinc-500" />
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <h2 className="text-sm font-medium text-zinc-400 uppercase tracking-wider mb-3">Notes</h2>
+        <div className="rounded-2xl border border-zinc-800 bg-zinc-900">
+          <div className="flex items-center px-6 py-4 gap-4">
+            <textarea name="notes" placeholder="—" rows={3}
+              value={notes} onChange={e => setNotes(e.target.value)}
+              className="flex-1 rounded-lg bg-zinc-800 px-3 py-2 text-white placeholder-zinc-600 border border-zinc-700 focus:outline-none focus:border-zinc-500 resize-none" />
           </div>
         </div>
       </div>

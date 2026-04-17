@@ -5,8 +5,14 @@ import { addStatus, deleteStatus } from '../app/actions'
 
 type Status = { id: number; name: string }
 
-function DeleteStatusButton({ id }: { id: number }) {
+const DEFAULT_STATUSES = ['Assigned', 'Available', 'Checked Out', 'Repair Needed', 'Retired', 'Booked']
+
+function DeleteStatusButton({ id, name }: { id: number; name: string }) {
   const [, startTransition] = useTransition()
+
+  if (DEFAULT_STATUSES.includes(name)) {
+    return <span className="text-xs text-zinc-600 italic">default</span>
+  }
 
   function handleDelete() {
     const formData = new FormData()
@@ -38,7 +44,7 @@ export default function SettingsStatusList({ statuses }: { statuses: Status[] })
           statuses.map(status => (
             <div key={status.id} className="flex items-center justify-between px-6 py-4">
               <span className="text-sm">{status.name}</span>
-              <DeleteStatusButton id={status.id} />
+              <DeleteStatusButton id={status.id} name={status.name} />
             </div>
           ))
         )}
