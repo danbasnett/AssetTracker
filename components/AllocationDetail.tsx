@@ -1,8 +1,11 @@
 'use client'
 
-import { useState, useTransition, useRef, useEffect } from 'react'
+import { useState, useTransition, useRef, useEffect, lazy, Suspense } from 'react'
 import { addAssetToAllocation, removeAssetFromAllocation } from '../app/actions'
 import Link from 'next/link'
+import { ScanLine } from 'lucide-react'
+
+const BarcodeScanner = lazy(() => import('./BarcodeScanner'))
 
 type AllocatedAsset = {
   id: number
@@ -31,6 +34,7 @@ export default function AllocationDetail({ allocation, allAssets, canManage }: {
   const [showSuggestions, setShowSuggestions] = useState(false)
   const [activeIndex, setActiveIndex] = useState(0)
   const [error, setError] = useState<string | null>(null)
+  const [scanning, setScanning] = useState(false)
   const [isPending, startTransition] = useTransition()
   const inputRef = useRef<HTMLInputElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -81,7 +85,21 @@ export default function AllocationDetail({ allocation, allAssets, canManage }: {
     inputRef.current?.focus()
   }
 
+  function handleScanResult(text: string) {
+    setScanning(false)
+    setQuery(text)
+    setShowSuggestions(true)
+    setActiveIndex(0)
+    inputRef.current?.focus()
+  }
+
   return (
+    <>
+    {scanning && (
+      <Suspense fallback={null}>
+        <BarcodeScanner onResult={handleScanResult} onClose={() => setScanning(false)} />
+      </Suspense>
+    )}
     <div className="mt-8 space-y-6">
       <div>
         <h2 className="text-sm font-medium text-zinc-400 uppercase tracking-wider mb-3">Assets</h2>
@@ -137,8 +155,16 @@ export default function AllocationDetail({ allocation, allAssets, canManage }: {
               onKeyDown={handleKeyDown}
               placeholder={mode === 'assign' ? 'Search assets to add…' : 'Search assets to remove…'}
               disabled={isPending}
-              className="w-full rounded-xl bg-zinc-800 px-4 py-2.5 text-white placeholder-zinc-500 border border-zinc-700 focus:outline-none focus:border-zinc-500 text-sm disabled:opacity-50"
+              className="w-full rounded-xl bg-zinc-800 pl-4 pr-10 py-2.5 text-white placeholder-zinc-500 border border-zinc-700 focus:outline-none focus:border-zinc-500 text-sm disabled:opacity-50"
             />
+            <button
+              type="button"
+              onClick={() => setScanning(true)}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-white"
+              title="Scan barcode"
+            >
+              <ScanLine size={18} />
+            </button>
 
             {showSuggestions && (
               <div className="absolute top-full mt-1 left-0 right-0 z-30 rounded-xl border border-zinc-700 bg-zinc-900 shadow-xl overflow-hidden">
@@ -168,5 +194,6 @@ export default function AllocationDetail({ allocation, allAssets, canManage }: {
         </div>
       )}
     </div>
+    </>
   )
 }

@@ -1,6 +1,7 @@
 'use client'
 
 import { useActionState, useTransition, useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { uploadLogo, removeLogo } from '../app/actions'
 
 export default function SettingsLogoUpload({ currentLogoUrl }: { currentLogoUrl?: string }) {
@@ -8,10 +9,10 @@ export default function SettingsLogoUpload({ currentLogoUrl }: { currentLogoUrl?
   const [preview, setPreview] = useState<string | null>(null)
   const [bust, setBust] = useState('')
   const [, startTransition] = useTransition()
+  const router = useRouter()
 
-  // After upload, clear local preview and add a cache-buster so the fresh file loads
   useEffect(() => {
-    if (state?.success) { setPreview(null); setBust(`?t=${Date.now()}`) }
+    if (state?.success) { setPreview(null); setBust(`?t=${Date.now()}`); router.refresh() }
   }, [state])
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
