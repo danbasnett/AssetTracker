@@ -3,14 +3,10 @@ import { requireAuth, hasRole } from '../../../../../lib/session'
 import { prisma } from '../../../../../lib/prisma'
 import fs from 'fs/promises'
 import path from 'path'
-import sharp from 'sharp'
-
 const ALLOWED: Record<string, string> = {
   'image/jpeg': 'jpg',
   'image/png':  'png',
   'image/webp': 'webp',
-  'image/heic': 'jpg',
-  'image/heif': 'jpg',
 }
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -30,10 +26,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const filename = `${Date.now()}.${ext}`
   const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'assets', String(assetId))
   await fs.mkdir(uploadDir, { recursive: true })
-  const buffer = Buffer.from(await file.arrayBuffer())
-  const isHeic = file.type === 'image/heic' || file.type === 'image/heif'
-  const finalBuffer = isHeic ? await sharp(buffer).jpeg({ quality: 85 }).toBuffer() : buffer
-  await fs.writeFile(path.join(uploadDir, filename), finalBuffer)
+  await fs.writeFile(path.join(uploadDir, filename), Buffer.from(await file.arrayBuffer()))
 
   const photo = await (prisma as any).assetPhoto.create({
     data: { assetId, path: `/uploads/assets/${assetId}/${filename}` },

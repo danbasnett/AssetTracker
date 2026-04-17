@@ -21,12 +21,33 @@ export default function AssetPhotoGallery({
   const fileRef = useRef<HTMLInputElement>(null)
   const cameraRef = useRef<HTMLInputElement>(null)
 
+  async function toJpeg(file: File): Promise<File> {
+    if (!file.type.startsWith('image/') || file.type === 'image/jpeg' || file.type === 'image/png' || file.type === 'image/webp') return file
+    return new Promise((resolve) => {
+      const url = URL.createObjectURL(file)
+      const img = new Image()
+      img.onload = () => {
+        const canvas = document.createElement('canvas')
+        canvas.width = img.naturalWidth
+        canvas.height = img.naturalHeight
+        canvas.getContext('2d')!.drawImage(img, 0, 0)
+        canvas.toBlob(blob => {
+          URL.revokeObjectURL(url)
+          resolve(blob ? new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' }) : file)
+        }, 'image/jpeg', 0.85)
+      }
+      img.onerror = () => { URL.revokeObjectURL(url); resolve(file) }
+      img.src = url
+    })
+  }
+
   async function upload(file: File) {
     setUploading(true)
     setError(null)
     try {
+      const uploadFile = await toJpeg(file)
       const fd = new FormData()
-      fd.append('photo', file)
+      fd.append('photo', uploadFile)
       const res = await fetch(`/api/assets/${assetId}/photos`, { method: 'POST', body: fd })
       const data = await res.json()
       if (!res.ok) { setError(data.error || 'Upload failed'); return }
@@ -80,7 +101,7 @@ export default function AssetPhotoGallery({
         <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
           {photos.map(ph => (
             <div key={ph.id} className="relative group aspect-square rounded-lg overflow-hidden bg-zinc-800">
-              <img src={ph.path} alt="" className="w-full h-full object-cover" />
+              <img src={ph.path} alt="" className="w-full h-full object-cover" onError={e => (e.currentTarget.style.display = 'none')} />
               <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
                 <button onClick={() => setLightbox(ph.path)}
                   className="p-1.5 rounded-lg bg-white/20 hover:bg-white/40 text-white transition-colors">

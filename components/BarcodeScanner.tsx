@@ -111,8 +111,8 @@ export default function BarcodeScanner({ onResult, onClose }: Props) {
   }
 
   return (
-    <div className="fixed inset-0 bg-black z-50 flex flex-col">
-      <div className="flex items-center justify-between px-4 py-3 bg-zinc-900/80">
+    <div className="fixed inset-0 bg-black z-50 flex flex-col" style={{ height: '100dvh' }}>
+      <div className="flex items-center justify-between px-4 py-3 bg-zinc-900/80" style={{ flexShrink: 0 }}>
         <span className="text-white font-medium">Scan barcode or QR code</span>
         <div className="flex items-center gap-2">
           {torchAvailable && (
@@ -126,7 +126,7 @@ export default function BarcodeScanner({ onResult, onClose }: Props) {
         </div>
       </div>
 
-      <div className="flex-1 relative flex items-center justify-center bg-black overflow-hidden">
+      <div className="relative bg-black overflow-hidden" style={{ flex: '1 1 0', minHeight: 0 }}>
         <video ref={videoRef} muted playsInline autoPlay className="w-full h-full object-cover" />
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
           <div className="w-64 h-44 relative">
@@ -144,7 +144,7 @@ export default function BarcodeScanner({ onResult, onClose }: Props) {
         )}
       </div>
 
-      <p className="text-center text-zinc-400 text-sm py-4 bg-zinc-900/80">
+      <p className="text-center text-zinc-400 text-sm py-4 bg-zinc-900/80" style={{ flexShrink: 0 }}>
         Point your camera at a barcode or QR code
       </p>
 
