@@ -3,7 +3,7 @@
 import { useState, useTransition, useRef, useEffect, lazy, Suspense } from 'react'
 import { addAssetToAllocation, removeAssetFromAllocation } from '../app/actions'
 import Link from 'next/link'
-import { ScanLine } from 'lucide-react'
+import { ScanLine, Check, X as XIcon } from 'lucide-react'
 
 const BarcodeScanner = lazy(() => import('./BarcodeScanner'))
 
@@ -28,6 +28,11 @@ type Asset = {
 
 type Mode = 'assign' | 'deassign'
 
+type ScanConfirm = {
+  asset: Asset
+  action: Mode
+}
+
 export default function AllocationDetail({ allocation, allAssets, canManage }: { allocation: Allocation; allAssets: Asset[]; canManage: boolean }) {
   const [mode, setMode] = useState<Mode>('assign')
   const [query, setQuery] = useState('')
@@ -35,6 +40,8 @@ export default function AllocationDetail({ allocation, allAssets, canManage }: {
   const [activeIndex, setActiveIndex] = useState(0)
   const [error, setError] = useState<string | null>(null)
   const [scanning, setScanning] = useState(false)
+  const [scanConfirm, setScanConfirm] = useState<ScanConfirm | null>(null)
+  const [scanNotFound, setScanNotFound] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
   const inputRef = useRef<HTMLInputElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -86,20 +93,105 @@ export default function AllocationDetail({ allocation, allAssets, canManage }: {
   }
 
   function handleScanResult(text: string) {
-    setScanning(false)
-    setQuery(text)
-    setShowSuggestions(true)
-    setActiveIndex(0)
-    inputRef.current?.focus()
+    // Match scanned barcode against all assets
+    const normalised = text.trim().toLowerCase()
+    const match = allAssets.find(a => a.assetTag.toLowerCase() === normalised)
+
+    if (!match) {
+      setScanNotFound(text)
+      setScanConfirm(null)
+      return
+    }
+
+    const isAllocated = allocatedIds.has(match.id)
+    // Determine action: if assigned mode pick assign, but if already in allocation offer remove; vice versa
+    const action: Mode = isAllocated ? 'deassign' : 'assign'
+    setScanConfirm({ asset: match, action })
+    setScanNotFound(null)
+  }
+
+  function confirmScan() {
+    if (!scanConfirm) return
+    setScanConfirm(null)
+    startTransition(async () => {
+      let result: any
+      if (scanConfirm.action === 'assign') {
+        const fd = new FormData()
+        fd.append('allocationId', String(allocation.id))
+        fd.append('assetId', String(scanConfirm.asset.id))
+        result = await addAssetToAllocation(null, fd)
+      } else {
+        result = await removeAssetFromAllocation(allocation.id, scanConfirm.asset.id)
+      }
+      if (result?.error) setError(result.error)
+      // Re-open scanner after action
+      setScanning(true)
+    })
+  }
+
+  function dismissScan() {
+    setScanConfirm(null)
+    setScanNotFound(null)
+    setScanning(true)
   }
 
   return (
     <>
-    {scanning && (
-      <Suspense fallback={null}>
-        <BarcodeScanner onResult={handleScanResult} onClose={() => setScanning(false)} />
-      </Suspense>
-    )}
+      {scanning && !scanConfirm && !scanNotFound && (
+        <Suspense fallback={null}>
+          <BarcodeScanner onResult={handleScanResult} onClose={() => setScanning(false)} />
+        </Suspense>
+      )}
+
+      {/* Scan confirm overlay */}
+      {(scanConfirm || scanNotFound) && (
+        <div className="fixed inset-0 bg-black/80 z-50 flex items-end sm:items-center justify-center p-4">
+          <div className="w-full max-w-sm rounded-2xl bg-zinc-900 border border-zinc-700 p-6 space-y-4">
+            {scanConfirm ? (
+              <>
+                <p className="text-sm text-zinc-400">
+                  {scanConfirm.action === 'assign' ? 'Add to allocation?' : 'Remove from allocation?'}
+                </p>
+                <div className="rounded-xl bg-zinc-800 px-4 py-3">
+                  <p className="font-medium text-white">{scanConfirm.asset.name}</p>
+                  <p className="text-xs text-zinc-500 mt-0.5">{scanConfirm.asset.assetTag}</p>
+                </div>
+                <div className="flex gap-3">
+                  <button
+                    onClick={confirmScan}
+                    disabled={isPending}
+                    className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-white px-4 py-2.5 text-black font-medium text-sm hover:bg-zinc-200 disabled:opacity-50"
+                  >
+                    <Check size={16} />
+                    {scanConfirm.action === 'assign' ? 'Add' : 'Remove'}
+                  </button>
+                  <button
+                    onClick={dismissScan}
+                    className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-zinc-800 px-4 py-2.5 text-zinc-300 font-medium text-sm hover:bg-zinc-700"
+                  >
+                    <XIcon size={16} />
+                    Skip
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="text-sm text-zinc-400">No asset found for scanned code:</p>
+                <div className="rounded-xl bg-zinc-800 px-4 py-3">
+                  <p className="font-mono text-sm text-zinc-300 break-all">{scanNotFound}</p>
+                </div>
+                <button
+                  onClick={dismissScan}
+                  className="w-full rounded-xl bg-zinc-800 px-4 py-2.5 text-zinc-300 font-medium text-sm hover:bg-zinc-700"
+                >
+                  Scan again
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
     <div className="mt-8 space-y-6">
       <div>
         <h2 className="text-sm font-medium text-zinc-400 uppercase tracking-wider mb-3">Assets</h2>
@@ -127,21 +219,31 @@ export default function AllocationDetail({ allocation, allAssets, canManage }: {
 
       {canManage && (
         <div className="space-y-3">
-          {/* Mode toggle */}
-          <div className="flex rounded-xl bg-zinc-800 p-1 gap-1 w-fit">
+          <div className="flex items-center gap-3">
+            {/* Mode toggle */}
+            <div className="flex rounded-xl bg-zinc-800 p-1 gap-1">
+              <button
+                type="button"
+                onClick={() => { setMode('assign'); setQuery('') }}
+                className={`rounded-lg px-4 py-1.5 text-sm font-medium transition-colors ${mode === 'assign' ? 'bg-white text-black' : 'text-zinc-400 hover:text-white'}`}
+              >
+                Assign
+              </button>
+              <button
+                type="button"
+                onClick={() => { setMode('deassign'); setQuery('') }}
+                className={`rounded-lg px-4 py-1.5 text-sm font-medium transition-colors ${mode === 'deassign' ? 'bg-white text-black' : 'text-zinc-400 hover:text-white'}`}
+              >
+                Remove
+              </button>
+            </div>
             <button
               type="button"
-              onClick={() => { setMode('assign'); setQuery('') }}
-              className={`rounded-lg px-4 py-1.5 text-sm font-medium transition-colors ${mode === 'assign' ? 'bg-white text-black' : 'text-zinc-400 hover:text-white'}`}
+              onClick={() => { setError(null); setScanning(true) }}
+              className="flex items-center gap-1.5 rounded-xl bg-zinc-800 border border-zinc-700 px-3 py-2 text-sm text-zinc-400 hover:text-white hover:border-zinc-500 transition-colors"
+              title="Scan barcode"
             >
-              Assign
-            </button>
-            <button
-              type="button"
-              onClick={() => { setMode('deassign'); setQuery('') }}
-              className={`rounded-lg px-4 py-1.5 text-sm font-medium transition-colors ${mode === 'deassign' ? 'bg-white text-black' : 'text-zinc-400 hover:text-white'}`}
-            >
-              Remove
+              <ScanLine size={16} /> Scan
             </button>
           </div>
 
@@ -155,16 +257,8 @@ export default function AllocationDetail({ allocation, allAssets, canManage }: {
               onKeyDown={handleKeyDown}
               placeholder={mode === 'assign' ? 'Search assets to add…' : 'Search assets to remove…'}
               disabled={isPending}
-              className="w-full rounded-xl bg-zinc-800 pl-4 pr-10 py-2.5 text-white placeholder-zinc-500 border border-zinc-700 focus:outline-none focus:border-zinc-500 text-sm disabled:opacity-50"
+              className="w-full rounded-xl bg-zinc-800 px-4 py-2.5 text-white placeholder-zinc-500 border border-zinc-700 focus:outline-none focus:border-zinc-500 text-sm disabled:opacity-50"
             />
-            <button
-              type="button"
-              onClick={() => setScanning(true)}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-white"
-              title="Scan barcode"
-            >
-              <ScanLine size={18} />
-            </button>
 
             {showSuggestions && (
               <div className="absolute top-full mt-1 left-0 right-0 z-30 rounded-xl border border-zinc-700 bg-zinc-900 shadow-xl overflow-hidden">
