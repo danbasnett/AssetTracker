@@ -12,6 +12,8 @@ export default function BarcodeScanner({ onResult, onClose }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const controlsRef = useRef<{ stop: () => void } | null>(null)
+  const onResultRef = useRef(onResult)
+  onResultRef.current = onResult
   const [error, setError] = useState<string | null>(null)
   const [torchOn, setTorchOn] = useState(false)
   const [torchAvailable, setTorchAvailable] = useState(false)
@@ -55,7 +57,7 @@ export default function BarcodeScanner({ onResult, onClose }: Props) {
           stream,
           videoRef.current,
           (result) => {
-            if (result && !cancelled) onResult(result.getText())
+            if (result && !cancelled) onResultRef.current(result.getText())
           }
         )
 
@@ -85,7 +87,7 @@ export default function BarcodeScanner({ onResult, onClose }: Props) {
       streamRef.current?.getTracks().forEach(t => t.stop())
       streamRef.current = null
     }
-  }, [onResult])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function toggleTorch() {
     const track = streamRef.current?.getVideoTracks()[0]
