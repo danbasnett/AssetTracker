@@ -1,6 +1,7 @@
 import { prisma } from '../../lib/prisma'
 import { requireAuth, hasRole } from '../../lib/session'
 import Link from 'next/link'
+import AllocationTable from '../../components/AllocationTable'
 
 export default async function AllocationsPage() {
   const session = await requireAuth()
@@ -28,42 +29,7 @@ export default async function AllocationsPage() {
         </div>
 
         <div className="mt-6 rounded-2xl border border-zinc-800 bg-zinc-900 overflow-hidden">
-          {allocations.length === 0 ? (
-            <p className="p-6 text-zinc-400">No allocations yet.</p>
-          ) : (
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-zinc-800 text-zinc-400">
-                  <th className="p-4 text-left">Name</th>
-                  <th className="p-4 text-left">Start</th>
-                  <th className="p-4 text-left">End</th>
-                  <th className="p-4 text-left">Assets</th>
-                </tr>
-              </thead>
-              <tbody>
-                {allocations.map(a => (
-                  <tr key={a.id} className="border-b border-zinc-800 last:border-0 hover:bg-zinc-800/40">
-                    <td className="p-4">
-                      <Link href={`/allocations/${a.id}`} className="hover:underline font-medium">
-                        {a.name}
-                      </Link>
-                    </td>
-                    <td className="p-4 text-zinc-400">
-                      {new Date(a.startDate).toLocaleDateString('en-GB')}
-                    </td>
-                    <td className="p-4 text-zinc-400">
-                      {a.indefinite ? (
-                        <span className="text-blue-400">Indefinite</span>
-                      ) : a.endDate ? (
-                        new Date(a.endDate).toLocaleDateString('en-GB')
-                      ) : '—'}
-                    </td>
-                    <td className="p-4 text-zinc-400">{a._count.assets}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
+          <AllocationTable allocations={allocations} canManage={canManage} />
         </div>
       </div>
     </main>

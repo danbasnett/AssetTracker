@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { ScanLine, LayoutTemplate, X } from 'lucide-react'
 import dynamic from 'next/dynamic'
 import { addAsset } from '../app/actions'
+import DatePicker from './DatePicker'
 const BarcodeScanner = dynamic(() => import('./BarcodeScanner'), { ssr: false })
 
 type Location = { id: number; name: string }
@@ -12,6 +13,7 @@ type Status = { id: number; name: string }
 type Template = {
   id: number
   name: string
+  type: string
   modelNumber: string | null
   supplier: string | null
   value: number | null
@@ -32,12 +34,30 @@ export default function NewAssetForm({ locations, statuses, templates }: { locat
   const templateContainerRef = useRef<HTMLDivElement>(null)
 
   // Controlled fields populated by template
+  const [type, setType] = useState('')
   const [name, setName] = useState('')
   const [modelNumber, setModelNumber] = useState('')
   const [supplier, setSupplier] = useState('')
   const [value, setValue] = useState('')
   const [locationId, setLocationId] = useState('')
   const [notes, setNotes] = useState('')
+
+  // Type field typeahead
+  const [typeQuery, setTypeQuery] = useState('')
+  const [showTypeSuggestions, setShowTypeSuggestions] = useState(false)
+  const typeContainerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (typeContainerRef.current && !typeContainerRef.current.contains(e.target as Node)) setShowTypeSuggestions(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  const typeSuggestions = templates.filter(t =>
+    typeQuery && t.name.toLowerCase().includes(typeQuery.toLowerCase())
+  ).slice(0, 6)
 
   useEffect(() => {
     if (state?.success) router.push('/assets')
@@ -61,7 +81,9 @@ export default function NewAssetForm({ locations, statuses, templates }: { locat
     setAppliedTemplate(t)
     setTemplateQuery(t.name)
     setShowTemplateSuggestions(false)
-    if (t.name) setName(t.name)
+    const resolvedType = t.type || t.name
+    setType(resolvedType)
+    setTypeQuery(resolvedType)
     if (t.modelNumber) setModelNumber(t.modelNumber)
     if (t.supplier) setSupplier(t.supplier)
     if (t.value != null) setValue(String(t.value))
@@ -141,6 +163,28 @@ export default function NewAssetForm({ locations, statuses, templates }: { locat
               value={name} onChange={e => setName(e.target.value)}
               className="flex-1 rounded-lg bg-zinc-800 px-3 py-2 text-white placeholder-zinc-600 border border-zinc-700 focus:outline-none focus:border-zinc-500" />
           </div>
+          <div className="flex items-center px-6 py-4 gap-4" ref={typeContainerRef}>
+            <label className="text-zinc-400 w-36 shrink-0">Type <span className="text-red-400">*</span></label>
+            <div className="flex-1 relative">
+              <input name="type" required placeholder="e.g. Gigacore 10T"
+                value={typeQuery}
+                onChange={e => { setTypeQuery(e.target.value); setType(e.target.value); setShowTypeSuggestions(true) }}
+                onFocus={() => setShowTypeSuggestions(true)}
+                className="w-full rounded-lg bg-zinc-800 px-3 py-2 text-white placeholder-zinc-600 border border-zinc-700 focus:outline-none focus:border-zinc-500" />
+              {showTypeSuggestions && typeSuggestions.length > 0 && (
+                <div className="absolute top-full mt-1 left-0 right-0 z-30 rounded-xl border border-zinc-700 bg-zinc-900 shadow-xl overflow-hidden">
+                  {typeSuggestions.map(t => (
+                    <button key={t.id} type="button"
+                      onMouseDown={e => { e.preventDefault(); setType(t.name); setTypeQuery(t.name); setShowTypeSuggestions(false) }}
+                      className="w-full flex items-center justify-between px-3 py-2 text-left hover:bg-zinc-800">
+                      <span className="text-sm text-white">{t.name}</span>
+                      {t.modelNumber && <span className="text-xs text-zinc-500">{t.modelNumber}</span>}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
           <div className="flex items-center px-6 py-4 gap-4">
             <label className="text-zinc-400 w-36 shrink-0">Asset Tag <span className="text-red-400">*</span></label>
             <div className="flex-1 relative flex items-center">
@@ -203,8 +247,7 @@ export default function NewAssetForm({ locations, statuses, templates }: { locat
           </div>
           <div className="flex items-center px-6 py-4 gap-4">
             <label className="text-zinc-400 w-36 shrink-0">Purchase Date</label>
-            <input name="purchaseDate" type="date"
-              className="flex-1 rounded-lg bg-zinc-800 px-3 py-2 text-white border border-zinc-700 focus:outline-none focus:border-zinc-500" />
+            <DatePicker name="purchaseDate" className="flex-1" />
           </div>
           <div className="flex items-center px-6 py-4 gap-4">
             <label className="text-zinc-400 w-36 shrink-0">Value (£)</label>

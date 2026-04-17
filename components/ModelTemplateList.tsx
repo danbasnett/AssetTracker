@@ -8,6 +8,7 @@ type Location = { id: number; name: string }
 type Template = {
   id: number
   name: string
+  type: string
   modelNumber: string | null
   supplier: string | null
   value: number | null
@@ -39,6 +40,11 @@ function TemplateForm({
         <div>
           <label className="block text-xs text-zinc-400 mb-1">Name <span className="text-red-400">*</span></label>
           <input name="name" required defaultValue={template?.name} placeholder='e.g. MacBook Pro 14"'
+            className="w-full rounded-xl bg-zinc-800 px-3 py-2 text-white placeholder-zinc-600 border border-zinc-700 focus:outline-none focus:border-zinc-500 text-sm" />
+        </div>
+        <div>
+          <label className="block text-xs text-zinc-400 mb-1">Type <span className="text-zinc-500 font-normal">(used to match assets)</span></label>
+          <input name="type" defaultValue={template?.type ?? ''} placeholder="e.g. MacBook Pro"
             className="w-full rounded-xl bg-zinc-800 px-3 py-2 text-white placeholder-zinc-600 border border-zinc-700 focus:outline-none focus:border-zinc-500 text-sm" />
         </div>
         <div>
@@ -114,6 +120,7 @@ export default function ModelTemplateList({ templates, locations }: { templates:
                     <p className="font-medium">{t.name}</p>
                     <p className="text-xs text-zinc-500 mt-0.5">
                       {[
+                        t.type && `Type: ${t.type}`,
                         t.modelNumber && `Model: ${t.modelNumber}`,
                         t.supplier && `Supplier: ${t.supplier}`,
                         t.value != null && `£${t.value.toFixed(2)}`,

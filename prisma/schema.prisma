@@ -32,6 +32,7 @@ model Asset {
   id           Int           @id @default(autoincrement())
   name         String
   assetTag     String        @unique
+  type         String        @default("")
   status       String        @default("available")
   locationId   Int?
   location     Location?     @relation(fields: [locationId], references: [id])
@@ -47,6 +48,23 @@ model Asset {
   allocations  Allocation[]  @relation("AllocationAssets")
   maintenance  Maintenance[]
   photos       AssetPhoto[]
+  tags         AssetTag[]
+}
+
+model Tag {
+  id        Int        @id @default(autoincrement())
+  name      String     @unique
+  color     String     @default("#6366f1")
+  createdAt DateTime   @default(now())
+  assets    AssetTag[]
+}
+
+model AssetTag {
+  assetId Int
+  tagId   Int
+  asset   Asset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  tag     Tag   @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  @@id([assetId, tagId])
 }
 
 model Person {
@@ -85,13 +103,25 @@ model Maintenance {
 }
 
 model Allocation {
-  id         Int       @id @default(autoincrement())
+  id         Int                   @id @default(autoincrement())
   name       String
   startDate  DateTime
   endDate    DateTime?
-  indefinite Boolean   @default(false)
-  createdAt  DateTime  @default(now())
-  assets     Asset[]   @relation("AllocationAssets")
+  indefinite Boolean               @default(false)
+  createdAt  DateTime              @default(now())
+  assets     Asset[]               @relation("AllocationAssets")
+  planItems  AllocationPlanItem[]
+}
+
+model AllocationPlanItem {
+  id           Int        @id @default(autoincrement())
+  allocationId Int
+  allocation   Allocation @relation(fields: [allocationId], references: [id], onDelete: Cascade)
+  description  String
+  modelNumber  String?
+  quantity     Int        @default(1)
+  notes        String?
+  createdAt    DateTime   @default(now())
 }
 
 model Consumable {
@@ -158,6 +188,7 @@ model Setting {
 model ModelTemplate {
   id          Int      @id @default(autoincrement())
   name        String   @unique
+  type        String   @default("")
   modelNumber String?
   supplier    String?
   value       Float?

@@ -252,6 +252,7 @@ export async function addAsset(prevState: any, formData: FormData) {
 
   const name = formData.get('name') as string
   const assetTag = formData.get('assetTag') as string
+  const type = (formData.get('type') as string)?.trim() || ''
   const status = formData.get('status') as string
   const locationId = formData.get('locationId') as string
   const serialNumber = formData.get('serialNumber') as string
@@ -260,11 +261,13 @@ export async function addAsset(prevState: any, formData: FormData) {
   const purchaseDate = formData.get('purchaseDate') as string
   const value = formData.get('value') as string
 
+  if (!type) return { error: 'Asset type is required' }
+
   let created: any
   try {
-    created = await prisma.asset.create({
+    created = await (prisma.asset.create as any)({
     data: {
-      name, assetTag, status,
+      name, assetTag, type, status,
       locationId: locationId ? parseInt(locationId) : null,
       serialNumber: serialNumber || null,
       modelNumber: modelNumber || null,
@@ -280,7 +283,7 @@ export async function addAsset(prevState: any, formData: FormData) {
     return { error: 'Something went wrong' }
   }
 
-  await audit(session.userId, session.username, 'CREATE', 'Asset', created.id, name, { assetTag, status, serialNumber: serialNumber||null, modelNumber: modelNumber||null, supplier: supplier||null, purchaseDate: purchaseDate||null, value: value||null, locationId: locationId||null })
+  await audit(session.userId, session.username, 'CREATE', 'Asset', created.id, name, { assetTag, type, status, serialNumber: serialNumber||null, modelNumber: modelNumber||null, supplier: supplier||null, purchaseDate: purchaseDate||null, value: value||null, locationId: locationId||null })
   revalidatePath('/assets')
   return { success: true }
 }
@@ -411,6 +414,7 @@ export async function updateAsset(prevState: any, formData: FormData) {
   const id = formData.get('id') as string
   const name = formData.get('name') as string
   const assetTag = formData.get('assetTag') as string
+  const type = (formData.get('type') as string)?.trim() || ''
   const status = formData.get('status') as string
   const locationId = formData.get('locationId') as string
   const serialNumber = formData.get('serialNumber') as string
@@ -419,14 +423,17 @@ export async function updateAsset(prevState: any, formData: FormData) {
   const purchaseDate = formData.get('purchaseDate') as string
   const value = formData.get('value') as string
 
+  if (!type) return { error: 'Asset type is required' }
+
   const before = await prisma.asset.findUnique({ where: { id: parseInt(id) } })
 
   try {
-    await prisma.asset.update({
+    await (prisma.asset.update as any)({
       where: { id: parseInt(id) },
       data: {
         name,
         assetTag,
+        type,
         status,
         locationId: locationId ? parseInt(locationId) : null,
         serialNumber: serialNumber || null,
@@ -444,8 +451,8 @@ export async function updateAsset(prevState: any, formData: FormData) {
   }
 
   const changes = before ? diff(
-    { name: before.name, assetTag: before.assetTag, status: before.status, serialNumber: before.serialNumber, modelNumber: before.modelNumber, supplier: before.supplier, value: before.value, locationId: before.locationId },
-    { name, assetTag, status, serialNumber: serialNumber||null, modelNumber: modelNumber||null, supplier: supplier||null, value: value ? parseFloat(value) : null, locationId: locationId ? parseInt(locationId) : null }
+    { name: before.name, assetTag: before.assetTag, type: (before as any).type, status: before.status, serialNumber: before.serialNumber, modelNumber: before.modelNumber, supplier: before.supplier, value: before.value, locationId: before.locationId },
+    { name, assetTag, type, status, serialNumber: serialNumber||null, modelNumber: modelNumber||null, supplier: supplier||null, value: value ? parseFloat(value) : null, locationId: locationId ? parseInt(locationId) : null }
   ) : {}
   await audit(session.userId, session.username, 'UPDATE', 'Asset', parseInt(id), name, { changes })
   revalidatePath('/assets')
@@ -576,6 +583,34 @@ export async function createAllocation(prevState: any, formData: FormData) {
   return { success: true }
 }
 
+export async function updateAllocation(prevState: any, formData: FormData) {
+  const session = await requireAuth()
+  if (!hasRole(session.role, 'MANAGEMENT')) return { error: 'Insufficient permissions' }
+
+  const id = parseInt(formData.get('id') as string)
+  const name = (formData.get('name') as string)?.trim()
+  const startDate = formData.get('startDate') as string
+  const endDate = formData.get('endDate') as string
+  const indefinite = formData.get('indefinite') === 'true'
+
+  if (!name) return { error: 'Name is required' }
+  if (!startDate) return { error: 'Start date is required' }
+
+  await prisma.allocation.update({
+    where: { id },
+    data: {
+      name,
+      startDate: new Date(startDate),
+      endDate: indefinite || !endDate ? null : new Date(endDate),
+      indefinite,
+    }
+  })
+
+  revalidatePath('/allocations')
+  revalidatePath(`/allocations/${id}`)
+  return { success: true }
+}
+
 export async function deleteAllocation(prevState: any, formData: FormData) {
   const session = await requireAuth()
   if (!hasRole(session.role, 'MANAGEMENT')) return { error: 'Insufficient permissions' }
@@ -693,17 +728,19 @@ export async function bulkUpdateAssets(prevState: any, formData: FormData) {
   const ids = formData.getAll('selectedIds') as string[]
   const status = formData.get('status') as string
   const locationId = formData.get('locationId') as string
+  const type = (formData.get('type') as string)?.trim()
 
   if (ids.length === 0) {
     return { error: 'No assets selected' }
   }
 
   const affectedAssets = await prisma.asset.findMany({ where: { id: { in: ids.map(id => parseInt(id)) } }, select: { id: true, name: true, assetTag: true } })
-  await prisma.asset.updateMany({
+  await (prisma.asset.updateMany as any)({
     where: { id: { in: ids.map(id => parseInt(id)) } },
     data: {
       ...(status ? { status } : {}),
-      ...(locationId ? { locationId: parseInt(locationId) } : {})
+      ...(locationId ? { locationId: parseInt(locationId) } : {}),
+      ...(type ? { type } : {}),
     }
   })
 
@@ -711,6 +748,7 @@ export async function bulkUpdateAssets(prevState: any, formData: FormData) {
     assets: affectedAssets.map(a => ({ id: a.id, name: a.name, assetTag: a.assetTag })),
     ...(status ? { status } : {}),
     ...(locationId ? { locationId: parseInt(locationId) } : {}),
+    ...(type ? { type } : {}),
   })
   revalidatePath('/assets')
   return { success: true }
@@ -1219,6 +1257,7 @@ export async function upsertModelTemplate(prevState: any, formData: FormData) {
   const name = (formData.get('name') as string)?.trim()
   if (!name) return { error: 'Name is required' }
 
+  const type = (formData.get('type') as string)?.trim() || ''
   const modelNumber = (formData.get('modelNumber') as string)?.trim() || null
   const supplier = (formData.get('supplier') as string)?.trim() || null
   const valueRaw = formData.get('value') as string
@@ -1227,7 +1266,7 @@ export async function upsertModelTemplate(prevState: any, formData: FormData) {
   const locationId = locationIdRaw ? parseInt(locationIdRaw) : null
   const notes = (formData.get('notes') as string)?.trim() || null
 
-  const data = { name, modelNumber, supplier, value, locationId, notes }
+  const data = { name, type, modelNumber, supplier, value, locationId, notes }
 
   try {
     if (id) {
@@ -1249,5 +1288,99 @@ export async function deleteModelTemplate(id: number) {
   if (!hasRole(session.role, 'ASSET_CONTROL')) return { error: 'Insufficient permissions' }
   await (prisma as any).modelTemplate.delete({ where: { id } })
   revalidatePath('/models')
+  return { success: true }
+}
+
+// ── Allocation Plan Items ─────────────────────────────────────────────────────
+
+export async function addPlanItem(prevState: any, formData: FormData) {
+  const session = await requireAuth()
+  if (!hasRole(session.role, 'MANAGEMENT')) return { error: 'Insufficient permissions' }
+
+  const allocationId = parseInt(formData.get('allocationId') as string)
+  const description = (formData.get('description') as string)?.trim()
+  if (!description) return { error: 'Description is required' }
+  const modelNumber = (formData.get('modelNumber') as string)?.trim() || null
+  const quantity = Math.max(1, parseInt((formData.get('quantity') as string) || '1'))
+  const notes = (formData.get('notes') as string)?.trim() || null
+
+  await (prisma as any).allocationPlanItem.create({
+    data: { allocationId, description, modelNumber, quantity, notes }
+  })
+
+  revalidatePath(`/allocations/${allocationId}`)
+  return { success: true }
+}
+
+export async function updatePlanItem(prevState: any, formData: FormData) {
+  const session = await requireAuth()
+  if (!hasRole(session.role, 'MANAGEMENT')) return { error: 'Insufficient permissions' }
+
+  const id = parseInt(formData.get('id') as string)
+  const description = (formData.get('description') as string)?.trim()
+  if (!description) return { error: 'Description is required' }
+  const modelNumber = (formData.get('modelNumber') as string)?.trim() || null
+  const quantity = Math.max(1, parseInt((formData.get('quantity') as string) || '1'))
+  const notes = (formData.get('notes') as string)?.trim() || null
+
+  const item = await (prisma as any).allocationPlanItem.update({
+    where: { id }, data: { description, modelNumber, quantity, notes }
+  })
+
+  revalidatePath(`/allocations/${item.allocationId}`)
+  return { success: true }
+}
+
+export async function deletePlanItem(id: number) {
+  const session = await requireAuth()
+  if (!hasRole(session.role, 'MANAGEMENT')) return { error: 'Insufficient permissions' }
+  const item = await (prisma as any).allocationPlanItem.delete({ where: { id } })
+  revalidatePath(`/allocations/${item.allocationId}`)
+  return { success: true }
+}
+
+// ── Tags ─────────────────────────────────────────────────────────────────────
+
+export async function upsertTag(prevState: any, formData: FormData) {
+  const session = await requireAuth()
+  if (!hasRole(session.role, 'ADMIN')) return { error: 'Insufficient permissions' }
+  const id = formData.get('id') as string | null
+  const name = (formData.get('name') as string)?.trim()
+  if (!name) return { error: 'Name is required' }
+  const color = (formData.get('color') as string) || '#6366f1'
+  try {
+    if (id) {
+      const tag = await (prisma as any).tag.update({ where: { id: parseInt(id) }, data: { name, color } })
+      revalidatePath('/settings')
+      return { success: true, tag }
+    } else {
+      const tag = await (prisma as any).tag.create({ data: { name, color } })
+      revalidatePath('/settings')
+      return { success: true, tag }
+    }
+  } catch (e: any) {
+    if (e.code === 'P2002') return { error: `Tag "${name}" already exists` }
+    throw e
+  }
+}
+
+export async function deleteTag(id: number) {
+  const session = await requireAuth()
+  if (!hasRole(session.role, 'ADMIN')) return { error: 'Insufficient permissions' }
+  await (prisma as any).tag.delete({ where: { id } })
+  revalidatePath('/settings')
+  return { success: true }
+}
+
+export async function setAssetTags(assetId: number, tagIds: number[]) {
+  const session = await requireAuth()
+  if (!hasRole(session.role, 'ASSET_CONTROL')) return { error: 'Insufficient permissions' }
+  await (prisma as any).assetTag.deleteMany({ where: { assetId } })
+  if (tagIds.length > 0) {
+    await (prisma as any).assetTag.createMany({
+      data: tagIds.map(tagId => ({ assetId, tagId }))
+    })
+  }
+  revalidatePath(`/assets/${assetId}`)
   return { success: true }
 }

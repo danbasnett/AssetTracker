@@ -6,14 +6,16 @@ import NoteEditor from '../../../components/NoteEditor'
 import AssetDetailEditor from '../../../components/AssetDetailEditor'
 import AssetExtras from '../../../components/AssetExtras'
 import AssetPhotoGallery from '../../../components/AssetPhotoGallery'
+import AssetTagPicker from '../../../components/AssetTagPicker'
 import { updateAssetNotes } from '../../actions'
 
 export default async function AssetDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const session = await requireAuth()
   const canEdit = hasRole(session.role, 'ASSET_CONTROL')
+  const canAdmin = hasRole(session.role, 'ADMIN')
 
-  const [asset, locations, statuses] = await Promise.all([
+  const [asset, locations, statuses, templates, allTags] = await Promise.all([
     (prisma.asset.findUnique as any)({
       where: { id: parseInt(id) },
       include: {
@@ -22,10 +24,13 @@ export default async function AssetDetailPage({ params }: { params: Promise<{ id
         allocations: { orderBy: { startDate: 'desc' } },
         maintenance: { orderBy: { scheduledDate: 'desc' } },
         photos: { orderBy: { createdAt: 'asc' } },
+        tags: { include: { tag: true } },
       },
     }) as Promise<any>,
     prisma.location.findMany({ orderBy: { name: 'asc' } }),
     prisma.status.findMany({ orderBy: { name: 'asc' } }),
+    (prisma as any).modelTemplate.findMany({ orderBy: { name: 'asc' } }),
+    (prisma as any).tag.findMany({ orderBy: { name: 'asc' } }),
   ])
 
   if (!asset) notFound()
@@ -40,7 +45,14 @@ export default async function AssetDetailPage({ params }: { params: Promise<{ id
         <h1 className="mt-4 text-3xl font-semibold">{asset.name}</h1>
         <p className="mt-1 text-zinc-400">{asset.assetTag}</p>
 
-        <AssetDetailEditor asset={asset as any} locations={locations} statuses={statuses} canEdit={canEdit} />
+        <AssetDetailEditor asset={asset as any} locations={locations} statuses={statuses} templates={templates} canEdit={canEdit} />
+        <AssetTagPicker
+          assetId={asset.id}
+          allTags={allTags}
+          currentTagIds={(asset.tags ?? []).map((at: any) => at.tagId)}
+          canEdit={canEdit}
+          canAdmin={canAdmin}
+        />
 
         <NoteEditor
           initialNotes={asset.notes}

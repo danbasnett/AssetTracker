@@ -2,6 +2,7 @@
 
 import React, { useActionState, useTransition, useState } from 'react'
 import { createMaintenance, updateMaintenance, deleteMaintenance, deleteMaintenanceSeries } from '../app/actions'
+import DatePicker from './DatePicker'
 import Link from 'next/link'
 import { SortIcon, sortRows, thCls, type SortDir } from './SortableHeader'
 
@@ -260,18 +261,18 @@ export default function MaintenanceTable({
           </select>
         </td>
         <td className="p-2">
-          <input type="date" value={editValues.scheduledDate ? new Date(editValues.scheduledDate).toISOString().split('T')[0] : ''}
-            onChange={e => setEditValues(v => ({ ...v, scheduledDate: e.target.value ? new Date(e.target.value) : null }))}
-            className={inputCls} />
+          <DatePicker
+            value={editValues.scheduledDate ? new Date(editValues.scheduledDate).toISOString().split('T')[0] : ''}
+            onChange={v => setEditValues(p => ({ ...p, scheduledDate: v ? new Date(v) : null }))} />
         </td>
         <td className="p-2">
-          <input type="date" value={editValues.completedDate ? new Date(editValues.completedDate).toISOString().split('T')[0] : ''}
-            onChange={e => setEditValues(v => ({
-              ...v,
-              completedDate: e.target.value ? new Date(e.target.value) : null,
-              status: e.target.value ? 'COMPLETED' : v.status,
-            }))}
-            className={inputCls} />
+          <DatePicker
+            value={editValues.completedDate ? new Date(editValues.completedDate).toISOString().split('T')[0] : ''}
+            onChange={v => setEditValues(p => ({
+              ...p,
+              completedDate: v ? new Date(v) : null,
+              status: v ? 'COMPLETED' : p.status,
+            }))} />
         </td>
         <td className="p-2">
           <input type="number" min="0" step="0.01" value={editValues.cost ?? ''}
@@ -285,11 +286,11 @@ export default function MaintenanceTable({
               className={inputCls}>
               {REPEAT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
-            <input type="date"
+            <DatePicker
               value={editValues.repeatEndDate ? new Date(editValues.repeatEndDate).toISOString().split('T')[0] : ''}
-              onChange={e => setEditValues(v => ({ ...v, repeatEndDate: e.target.value ? new Date(e.target.value) : null }))}
+              onChange={v => setEditValues(p => ({ ...p, repeatEndDate: v ? new Date(v) : null }))}
               placeholder="End date"
-              className={inputCls + ' mt-1'} />
+              className="mt-1" />
             <div className="flex gap-1 mt-1">
               <button type="button" onClick={() => saveEdit(r.id)}
                 className="rounded-lg bg-white px-2 py-1 text-black text-xs font-medium">Save</button>
@@ -432,8 +433,7 @@ export default function MaintenanceTable({
             </div>
             <div>
               <label className="text-xs text-zinc-500 mb-1 block">Scheduled date</label>
-              <input name="scheduledDate" type="date"
-                className="w-full rounded-xl bg-zinc-800 px-3 py-2 text-white text-sm border border-zinc-700 focus:outline-none focus:border-zinc-500" />
+              <DatePicker name="scheduledDate" className="w-full" />
             </div>
             <div>
               <label className="text-xs text-zinc-500 mb-1 block">Cost (£)</label>
@@ -451,8 +451,7 @@ export default function MaintenanceTable({
             </div>
             <div>
               <label className="text-xs text-zinc-500 mb-1 block">Repeat end date</label>
-              <input name="repeatEndDate" type="date"
-                className="w-full rounded-xl bg-zinc-800 px-3 py-2 text-white text-sm border border-zinc-700 focus:outline-none focus:border-zinc-500" />
+              <DatePicker name="repeatEndDate" className="w-full" />
             </div>
             <div className="col-span-2 sm:col-span-3">
               <label className="text-xs text-zinc-500 mb-1 block">Description</label>

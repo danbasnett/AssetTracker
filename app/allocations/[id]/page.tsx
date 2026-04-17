@@ -3,18 +3,23 @@ import { requireAuth, hasRole } from '../../../lib/session'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import AllocationDetail from '../../../components/AllocationDetail'
+import AllocationDetailHeader from '../../../components/AllocationDetailHeader'
 
 export default async function AllocationDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const session = await requireAuth()
   const canManage = hasRole(session.role, 'MANAGEMENT')
 
-  const [allocation, allAssets] = await Promise.all([
-    prisma.allocation.findUnique({
+  const [allocation, allAssets, templates] = await Promise.all([
+    (prisma as any).allocation.findUnique({
       where: { id: parseInt(id) },
-      include: { assets: { include: { location: true }, orderBy: { name: 'asc' } } }
+      include: {
+        assets: { include: { location: true }, orderBy: { name: 'asc' } },
+        planItems: { orderBy: { createdAt: 'asc' } },
+      }
     }),
-    prisma.asset.findMany({ orderBy: { name: 'asc' } })
+    prisma.asset.findMany({ orderBy: { name: 'asc' } }),
+    (prisma as any).modelTemplate.findMany({ orderBy: { name: 'asc' } }),
   ])
 
   if (!allocation) notFound()
@@ -25,14 +30,9 @@ export default async function AllocationDetailPage({ params }: { params: Promise
         <Link href="/allocations" className="text-zinc-400 hover:text-white text-sm">
           ← Back to Allocations
         </Link>
-        <h1 className="mt-4 text-3xl font-semibold">{allocation.name}</h1>
-        <p className="mt-1 text-zinc-400">
-          {new Date(allocation.startDate).toLocaleDateString('en-GB')}
-          {' — '}
-          {allocation.indefinite ? 'Indefinite' : allocation.endDate ? new Date(allocation.endDate).toLocaleDateString('en-GB') : 'No end date'}
-        </p>
+        <AllocationDetailHeader allocation={allocation} canManage={canManage} />
 
-        <AllocationDetail allocation={allocation} allAssets={allAssets} canManage={canManage} />
+        <AllocationDetail allocation={allocation} allAssets={allAssets} canManage={canManage} templates={templates} />
       </div>
     </main>
   )

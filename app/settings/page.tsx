@@ -7,6 +7,7 @@ import SettingsDeleteAll from '../../components/SettingsDeleteAll'
 import SettingsImport from '../../components/SettingsImport'
 import SettingsExport from '../../components/SettingsExport'
 import SettingsSso from '../../components/SettingsSso'
+import SettingsTagList from '../../components/SettingsTagList'
 
 const DEFAULT_STATUSES = ['Assigned', 'Available', 'Checked Out', 'Repair Needed', 'Retired', 'Booked']
 
@@ -21,11 +22,12 @@ export default async function SettingsPage() {
     await prisma.status.createMany({ data: missing.map(name => ({ name })) })
   }
 
-  const [statuses, users, logoSetting, ssoProviders] = await Promise.all([
+  const [statuses, users, logoSetting, ssoProviders, tags] = await Promise.all([
     prisma.status.findMany({ orderBy: { name: 'asc' } }),
     prisma.user.findMany({ orderBy: { username: 'asc' } }),
     prisma.setting.findUnique({ where: { key: 'logoPath' } }),
     (prisma as any).oAuthProvider.findMany({ orderBy: { createdAt: 'asc' } }),
+    (prisma as any).tag.findMany({ orderBy: { name: 'asc' } }),
   ])
 
   return (
@@ -52,6 +54,11 @@ export default async function SettingsPage() {
         <div className="mt-10">
           <h2 className="text-sm font-medium text-zinc-400 uppercase tracking-wider mb-3">Export Data</h2>
           <SettingsExport />
+        </div>
+
+        <div className="mt-10">
+          <h2 className="text-sm font-medium text-zinc-400 uppercase tracking-wider mb-3">Asset Tags</h2>
+          <SettingsTagList tags={tags} />
         </div>
 
         <div className="mt-10">

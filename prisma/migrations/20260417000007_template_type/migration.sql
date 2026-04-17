@@ -1,0 +1,1 @@
+ALTER TABLE "ModelTemplate" ADD COLUMN "type" TEXT NOT NULL DEFAULT '';

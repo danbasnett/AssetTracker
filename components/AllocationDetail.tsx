@@ -4,6 +4,7 @@ import { useState, useTransition, useRef, useEffect, lazy, Suspense } from 'reac
 import { addAssetToAllocation, removeAssetFromAllocation } from '../app/actions'
 import Link from 'next/link'
 import { ScanLine, Check, X as XIcon } from 'lucide-react'
+import AllocationPlan from './AllocationPlan'
 
 const BarcodeScanner = lazy(() => import('./BarcodeScanner'))
 
@@ -11,13 +12,30 @@ type AllocatedAsset = {
   id: number
   name: string
   assetTag: string
+  type?: string | null
   status: string
+  modelNumber: string | null
   location: { name: string } | null
+}
+
+type PlanItem = {
+  id: number
+  description: string
+  modelNumber: string | null
+  quantity: number
+  notes: string | null
+}
+
+type Template = {
+  id: number
+  name: string
+  modelNumber: string | null
 }
 
 type Allocation = {
   id: number
   assets: AllocatedAsset[]
+  planItems: PlanItem[]
 }
 
 type Asset = {
@@ -33,7 +51,7 @@ type ScanConfirm = {
   action: Mode
 }
 
-export default function AllocationDetail({ allocation, allAssets, canManage }: { allocation: Allocation; allAssets: Asset[]; canManage: boolean }) {
+export default function AllocationDetail({ allocation, allAssets, canManage, templates }: { allocation: Allocation; allAssets: Asset[]; canManage: boolean; templates: Template[] }) {
   const [mode, setMode] = useState<Mode>('assign')
   const [query, setQuery] = useState('')
   const [showSuggestions, setShowSuggestions] = useState(false)
@@ -191,6 +209,14 @@ export default function AllocationDetail({ allocation, allAssets, canManage }: {
           </div>
         </div>
       )}
+
+    <AllocationPlan
+      allocationId={allocation.id}
+      planItems={allocation.planItems}
+      assignedAssets={allocation.assets}
+      templates={templates}
+      canManage={canManage}
+    />
 
     <div className="mt-8 space-y-6">
       <div>

@@ -1,15 +1,19 @@
 'use client'
 
-import { useState, useTransition, useActionState } from 'react'
+import { useState, useTransition, useActionState, useEffect, useRef } from 'react'
 import { updateAsset, reportProblem } from '../app/actions'
+import DatePicker from './DatePicker'
 
 type Location = { id: number; name: string }
 type Status = { id: number; name: string }
+
+type Template = { id: number; name: string; type: string; modelNumber: string | null }
 
 type Asset = {
   id: number
   name: string
   assetTag: string
+  type: string
   status: string
   locationId: number | null
   location: { name: string } | null
@@ -21,13 +25,17 @@ type Asset = {
   createdAt: Date
 }
 
-export default function AssetDetailEditor({ asset, locations, statuses, canEdit }: { asset: Asset; locations: Location[]; statuses: Status[]; canEdit: boolean }) {
+export default function AssetDetailEditor({ asset, locations, statuses, templates, canEdit }: { asset: Asset; locations: Location[]; statuses: Status[]; templates: Template[]; canEdit: boolean }) {
   const [editing, setEditing] = useState(false)
   const [showReportForm, setShowReportForm] = useState(false)
   const [reportState, reportAction] = useActionState(reportProblem, null)
+  const [typeQuery, setTypeQuery] = useState(asset.type)
+  const [showTypeSuggestions, setShowTypeSuggestions] = useState(false)
+  const typeContainerRef = useRef<HTMLDivElement>(null)
   const [values, setValues] = useState({
     name: asset.name,
     assetTag: asset.assetTag,
+    type: asset.type,
     status: asset.status,
     locationId: asset.locationId ? String(asset.locationId) : '',
     serialNumber: asset.serialNumber ?? '',
@@ -39,11 +47,24 @@ export default function AssetDetailEditor({ asset, locations, statuses, canEdit 
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
 
+  const typeSuggestions = templates.filter(t =>
+    typeQuery && t.name.toLowerCase().includes(typeQuery.toLowerCase())
+  ).slice(0, 6)
+
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (typeContainerRef.current && !typeContainerRef.current.contains(e.target as Node)) setShowTypeSuggestions(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
   function save() {
     const formData = new FormData()
     formData.append('id', String(asset.id))
     formData.append('name', values.name)
     formData.append('assetTag', values.assetTag)
+    formData.append('type', values.type)
     formData.append('status', values.status)
     formData.append('locationId', values.locationId)
     formData.append('serialNumber', values.serialNumber)
@@ -126,6 +147,29 @@ export default function AssetDetailEditor({ asset, locations, statuses, canEdit 
           ) : <span>{asset.name}</span>}
         </div>
         <div className="flex justify-between items-center px-6 py-4">
+          <span className="text-zinc-400">Type</span>
+          {editing ? (
+            <div ref={typeContainerRef} className="relative">
+              <input value={typeQuery}
+                onChange={e => { setTypeQuery(e.target.value); setValues(v => ({ ...v, type: e.target.value })); setShowTypeSuggestions(true) }}
+                onFocus={() => setShowTypeSuggestions(true)}
+                placeholder="required"
+                className="rounded-lg bg-zinc-800 px-3 py-1 text-white border border-zinc-700 text-sm w-48" />
+              {showTypeSuggestions && typeSuggestions.length > 0 && (
+                <div className="absolute top-full mt-1 right-0 z-30 w-56 rounded-xl border border-zinc-700 bg-zinc-900 shadow-xl overflow-hidden">
+                  {typeSuggestions.map(t => (
+                    <button key={t.id} type="button"
+                      onMouseDown={e => { e.preventDefault(); setTypeQuery(t.name); setValues(v => ({ ...v, type: t.name })); setShowTypeSuggestions(false) }}
+                      className="w-full px-3 py-2 text-left text-sm text-white hover:bg-zinc-800">
+                      {t.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : <span className={asset.type ? '' : 'text-zinc-500 italic'}>{asset.type || 'Not set'}</span>}
+        </div>
+        <div className="flex justify-between items-center px-6 py-4">
           <span className="text-zinc-400">Asset Tag</span>
           {editing ? (
             <input value={values.assetTag} onChange={e => setValues(v => ({ ...v, assetTag: e.target.value }))}
@@ -159,8 +203,8 @@ export default function AssetDetailEditor({ asset, locations, statuses, canEdit 
         <div className="flex justify-between items-center px-6 py-4">
           <span className="text-zinc-400">Purchase Date</span>
           {editing ? (
-            <input type="date" value={values.purchaseDate} onChange={e => setValues(v => ({ ...v, purchaseDate: e.target.value }))}
-              className="rounded-lg bg-zinc-800 px-3 py-1 text-white border border-zinc-700 text-sm" />
+            <DatePicker value={values.purchaseDate} onChange={v => setValues(p => ({ ...p, purchaseDate: v }))}
+              className="w-44" />
           ) : <span>{asset.purchaseDate ? new Date(asset.purchaseDate).toLocaleDateString('en-GB') : '—'}</span>}
         </div>
         <div className="flex justify-between items-center px-6 py-4">

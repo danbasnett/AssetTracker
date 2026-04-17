@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createAllocation } from '../app/actions'
+import DatePicker from './DatePicker'
 
 export default function NewAllocationForm() {
   const [state, formAction] = useActionState(createAllocation, null)
@@ -29,15 +30,13 @@ export default function NewAllocationForm() {
           </div>
           <div className="flex items-center px-6 py-4 gap-4">
             <label className="text-zinc-400 w-36 shrink-0">Start Date <span className="text-red-400">*</span></label>
-            <input name="startDate" type="date" required
-              className="flex-1 rounded-lg bg-zinc-800 px-3 py-2 text-white border border-zinc-700 focus:outline-none focus:border-zinc-500" />
+            <DatePicker name="startDate" className="flex-1" />
           </div>
           <div className="flex items-center px-6 py-4 gap-4">
             <label className="text-zinc-400 w-36 shrink-0">End Date</label>
             <div className="flex-1 flex items-center gap-4">
               {!indefinite && (
-                <input name="endDate" type="date"
-                  className="flex-1 rounded-lg bg-zinc-800 px-3 py-2 text-white border border-zinc-700 focus:outline-none focus:border-zinc-500" />
+                <DatePicker name="endDate" className="flex-1" />
               )}
               <label className="flex items-center gap-2 text-sm text-zinc-400 cursor-pointer select-none">
                 <input

@@ -1,0 +1,14 @@
+CREATE TABLE "Tag" (
+  "id"        SERIAL PRIMARY KEY,
+  "name"      TEXT NOT NULL UNIQUE,
+  "color"     TEXT NOT NULL DEFAULT '#6366f1',
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE "AssetTag" (
+  "assetId" INTEGER NOT NULL,
+  "tagId"   INTEGER NOT NULL,
+  PRIMARY KEY ("assetId", "tagId"),
+  CONSTRAINT "AssetTag_assetId_fkey" FOREIGN KEY ("assetId") REFERENCES "Asset"("id") ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT "AssetTag_tagId_fkey"   FOREIGN KEY ("tagId")   REFERENCES "Tag"("id")   ON DELETE CASCADE ON UPDATE CASCADE
+);

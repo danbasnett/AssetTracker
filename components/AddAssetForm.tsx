@@ -2,6 +2,7 @@
 
 import { useActionState, useState } from 'react'
 import { addAsset } from '../app/actions'
+import DatePicker from './DatePicker'
 
 type Location = { id: number; name: string }
 
@@ -33,8 +34,7 @@ export default function AddAssetForm({ locations }: { locations: Location[] }) {
           className="rounded-xl bg-zinc-800 px-4 py-2 text-white placeholder-zinc-500 border border-zinc-700" />
         <input name="supplier" placeholder="Supplier" value={supplier} onChange={e => setSupplier(e.target.value)}
           className="rounded-xl bg-zinc-800 px-4 py-2 text-white placeholder-zinc-500 border border-zinc-700" />
-        <input name="purchaseDate" type="date" value={purchaseDate} onChange={e => setPurchaseDate(e.target.value)}
-          className="rounded-xl bg-zinc-800 px-4 py-2 text-white border border-zinc-700" />
+        <DatePicker name="purchaseDate" value={purchaseDate} onChange={setPurchaseDate} placeholder="Purchase date" />
         <input name="value" type="number" min="0" step="0.01" placeholder="Value (£)" value={value} onChange={e => setValue(e.target.value)}
           className="rounded-xl bg-zinc-800 px-4 py-2 text-white placeholder-zinc-500 border border-zinc-700 w-32" />
         <select name="status" value={status} onChange={e => setStatus(e.target.value)}
