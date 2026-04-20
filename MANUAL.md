@@ -3,6 +3,7 @@
 ## Table of Contents
 
 1. [Getting Started](#1-getting-started)
+   - [Updating the Software](#updating-the-software)
 2. [Dashboard](#2-dashboard)
 3. [Navigation](#3-navigation)
 4. [Assets](#4-assets)
@@ -30,6 +31,26 @@ When no users exist in the system, the login page will prompt you to create the 
 Navigate to the app URL and enter your username and password. If your organisation has configured Single Sign-On (SSO), provider buttons will appear on the login page and you can authenticate via those instead.
 
 Sessions last 8 hours, after which you will be asked to log in again.
+
+### Updating the Software
+
+#### Docker installs
+
+```bash
+git pull
+docker compose up --build -d
+```
+
+Pull the latest code and rebuild. The container restarts automatically, new database migrations run on startup, and all your data (database and uploaded photos) is preserved in Docker volumes. The app will be briefly unavailable while the container restarts — usually under a minute.
+
+#### Manual installs
+
+```bash
+git pull
+npm install
+npx prisma migrate deploy
+npm run build && npm start
+```
 
 ---
 

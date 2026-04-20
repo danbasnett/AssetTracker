@@ -1,0 +1,10 @@
+node_modules
+.next
+.env
+.env.*
+public/uploads
+*.pem
+npm-debug.log*
+.DS_Store
+README.md
+MANUAL.md

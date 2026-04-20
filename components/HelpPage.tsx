@@ -81,10 +81,6 @@ function Li({ children, query }: { children: string; query: string }) {
   )
 }
 
-function Code({ children }: { children: string }) {
-  return <code className="bg-zinc-800 text-zinc-200 px-1.5 py-0.5 rounded text-xs font-mono">{children}</code>
-}
-
 function buildSections(query: string): Section[] {
   return [
     {
@@ -93,6 +89,7 @@ function buildSections(query: string): Section[] {
       subsections: [
         { id: 'first-time-setup', title: 'First-Time Setup' },
         { id: 'logging-in', title: 'Logging In' },
+        { id: 'updating', title: 'Updating the Software' },
       ],
       content: (
         <div>
@@ -102,6 +99,13 @@ function buildSections(query: string): Section[] {
           <H3 id="logging-in" query={query}>Logging In</H3>
           <P query={query}>Navigate to the app URL and enter your username and password. If your organisation has configured Single Sign-On (SSO), provider buttons will appear on the login page and you can authenticate via those instead.</P>
           <P query={query}>Sessions last 8 hours, after which you will be asked to log in again.</P>
+
+          <H3 id="updating" query={query}>Updating the Software</H3>
+          <H4 query={query}>Docker installs</H4>
+          <pre className="bg-zinc-800 text-zinc-200 rounded-lg px-4 py-3 text-sm font-mono my-2 overflow-x-auto">{`git pull\ndocker compose up --build -d`}</pre>
+          <P query={query}>Pull the latest code and rebuild. The container restarts automatically, new database migrations run on startup, and all your data is preserved. The app will be briefly unavailable while the container restarts — usually under a minute.</P>
+          <H4 query={query}>Manual installs</H4>
+          <pre className="bg-zinc-800 text-zinc-200 rounded-lg px-4 py-3 text-sm font-mono my-2 overflow-x-auto">{`git pull\nnpm install\nnpx prisma migrate deploy\nnpm run build && npm start`}</pre>
         </div>
       ),
     },

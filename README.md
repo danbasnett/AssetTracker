@@ -28,14 +28,65 @@ A self-hosted asset management system built with Next.js, PostgreSQL, and Prisma
 | Styling | Tailwind CSS 4 |
 | Server | Custom Node.js (HTTP or HTTPS) |
 
-## Requirements
+## Installation
 
-- Node.js 20+
-- PostgreSQL 14+
+### Option A — Docker (recommended, no setup required)
 
-## Setup
+Requires [Docker Desktop](https://www.docker.com/products/docker-desktop/).
 
-### 1. Clone and install dependencies
+```bash
+git clone <repo-url>
+cd AssetTracker
+
+# Copy the example env file and set your session secret
+cp .env.example .env
+# Edit .env and fill in SESSION_SECRET (run: openssl rand -base64 32)
+
+docker compose up --build
+```
+
+Open [http://localhost:3000](http://localhost:3000). On first load you will be prompted to create the first admin account. That's it — PostgreSQL is included, migrations run automatically.
+
+To run in the background:
+```bash
+docker compose up --build -d
+```
+
+To stop:
+```bash
+docker compose down
+```
+
+Data is stored in Docker volumes (`db_data` for the database, `uploads` for photos) and persists between restarts.
+
+#### Updating (Docker)
+
+```bash
+git pull
+docker compose up --build -d
+```
+
+That's all. The new image is built, any new database migrations run automatically on startup, and your data is untouched. The app will be briefly unavailable while the container restarts (usually under a minute).
+
+---
+
+### Option B — Guided setup script
+
+Requires Node.js 20+ and PostgreSQL 14+ to already be installed.
+
+```bash
+git clone <repo-url>
+cd AssetTracker
+bash setup.sh
+```
+
+The script checks dependencies, prompts for database details, creates `.env`, installs packages, and runs migrations. Follow the instructions it prints at the end.
+
+---
+
+### Option C — Manual setup
+
+Requirements: Node.js 20+, PostgreSQL 14+
 
 ```bash
 git clone <repo-url>
@@ -43,48 +94,27 @@ cd AssetTracker
 npm install
 ```
 
-### 2. Configure environment
-
-Create a `.env` file in the project root:
+Copy `.env.example` to `.env` and fill in the values:
 
 ```env
 DATABASE_URL="postgresql://user:password@localhost:5432/assetdb"
-SESSION_SECRET="your-secret-at-least-32-characters-long"
+SESSION_SECRET="<output of: openssl rand -base64 32>"
 ```
 
-Generate a session secret:
-```bash
-openssl rand -base64 32
-```
-
-To use an existing remote database (e.g. on a Raspberry Pi), replace `localhost` with the host's IP address.
-
-### 3. Run database migrations
+To use an existing remote database (e.g. on a Raspberry Pi), set `DATABASE_URL` with that host's IP instead of `localhost`.
 
 ```bash
 npx prisma migrate deploy
+npm run dev        # development
+# or
+npm run build && npm start   # production
 ```
 
-### 4. Start the development server
+Open [http://localhost:3000](http://localhost:3000).
 
-```bash
-npm run dev
-```
+### HTTPS (optional, all install methods)
 
-Open [http://localhost:3000](http://localhost:3000). On first load, you will be prompted to create the initial admin account.
-
-### 5. Production
-
-```bash
-npm run build
-npm start
-```
-
-### HTTPS (optional)
-
-Place SSL certificate files at `./certs/key.pem` and `./certs/cert.pem`. The server detects these automatically and switches to HTTPS.
-
-You can override the paths with environment variables:
+Place SSL certificate files at `./certs/key.pem` and `./certs/cert.pem`. The server switches to HTTPS automatically when both files exist. Override the paths with:
 
 ```env
 SSL_KEY_PATH=/path/to/key.pem
