@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useSidebar } from './SidebarContext'
-import { Home, Package, MapPin, ChevronLeft, ChevronRight, Table, Settings, ClipboardList, LogOut, Users, Wrench, ScrollText, LayoutTemplate, Tag, Boxes } from 'lucide-react'
+import { Home, Package, MapPin, ChevronLeft, ChevronRight, Table, Settings, ClipboardList, LogOut, Users, Wrench, ScrollText, LayoutTemplate, Tag, Boxes, HelpCircle } from 'lucide-react'
 import { useTransition } from 'react'
 import { logout } from '../app/actions'
 import type { Role } from '../lib/session'
@@ -75,6 +75,10 @@ export default function Sidebar({ logoUrl, userRole, username, avatarUrl }: { lo
 
         {/* Bottom items */}
         <SidebarAvatar username={username} avatarUrl={avatarUrl} collapsed={collapsed} />
+        <Link href="/help" className={navLinkClass('/help')}>
+          <HelpCircle size={22} className="shrink-0" />
+          <span className={LABEL_CLASS(collapsed)}>Help</span>
+        </Link>
         <Link href="/types" className={navLinkClass('/types')}>
           <Tag size={22} className="shrink-0" />
           <span className={LABEL_CLASS(collapsed)}>Types</span>
@@ -104,7 +108,7 @@ export default function Sidebar({ logoUrl, userRole, username, avatarUrl }: { lo
       {/* Mobile bottom nav */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 bg-zinc-900 border-t border-zinc-800 z-50">
         <div className="flex overflow-x-auto scrollbar-none px-1 py-2">
-          {[...links, { href: '/types', label: 'Types', icon: Tag }, ...(userRole === 'ADMIN' ? [{ href: '/audit', label: 'Audit', icon: ScrollText }, { href: '/settings', label: 'Settings', icon: Settings }] : [])].map(link => {
+          {[...links, { href: '/help', label: 'Help', icon: HelpCircle }, { href: '/types', label: 'Types', icon: Tag }, ...(userRole === 'ADMIN' ? [{ href: '/audit', label: 'Audit', icon: ScrollText }, { href: '/settings', label: 'Settings', icon: Settings }] : [])].map(link => {
             const Icon = link.icon
             return (
               <Link
