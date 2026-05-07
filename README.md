@@ -30,225 +30,102 @@ A self-hosted asset management system built with Next.js, PostgreSQL, and Prisma
 
 ---
 
-## Installation
+## Quick Install (Linux — recommended)
 
-Choose the method that best fits your environment.
+One command installs and starts everything. Run as root or with sudo:
 
-### Option A — Docker (recommended)
-
-The easiest path. PostgreSQL is included — you don't need to install or configure it separately.
-
-#### 1. Install Docker
-
-**Mac/Windows:** Install [Docker Desktop](https://www.docker.com/products/docker-desktop/).
-
-**Linux (including LXC/VPS):**
 ```bash
-apt install docker.io docker-compose -y
-systemctl enable docker
-systemctl start docker
+bash <(curl -fsSL https://raw.githubusercontent.com/danbasnett/AssetTracker/main/install.sh)
 ```
 
-#### 2. Clone the repo and fix the entrypoint script
+This script will:
+- Install Docker if it isn't already present
+- Clone the repo to `/opt/assettracker`
+- Generate a secure session secret automatically
+- Create the `.env` file
+- Build and start the app in the background
 
-> **Known issue:** `docker-entrypoint.sh` uses a bash feature (`<<<`) that isn't supported by the Alpine shell inside the container. The fix below rewrites it correctly.
+When it finishes it will print the URL to open in your browser. On first load you will be prompted to create the first admin account.
+
+> **First run takes 5–15 minutes** on low-spec machines (LXC, VPS, Raspberry Pi) while Next.js compiles. This is normal — it only happens once.
+
+> **Space required:** The Docker build needs approximately 2–3 GB of free disk space. Check with `df -h /` before running.
+
+### Updating
+
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/danbasnett/AssetTracker/main/install.sh)
+```
+
+Re-running the install script pulls the latest code and rebuilds. Your data is stored in Docker volumes and is never touched.
+
+---
+
+## Manual Install (Docker)
+
+If you prefer to do it step by step, or aren't on Linux:
+
+**Requirements:** [Docker Desktop](https://www.docker.com/products/docker-desktop/) (Mac/Windows) or Docker Engine + Compose (Linux)
 
 ```bash
 git clone https://github.com/danbasnett/AssetTracker.git
 cd AssetTracker
-
-cat > docker-entrypoint.sh << 'EOF'
-#!/bin/sh
-set -e
-
-echo "Waiting for database..."
-until echo "SELECT 1" | npx prisma db execute --stdin > /dev/null 2>&1; do
-  sleep 1
-done
-
-echo "Running database migrations..."
-npx prisma migrate deploy
-
-echo "Starting Asset Tracker..."
-exec node server.mjs
-EOF
 ```
 
-#### 3. Create the `.env` file
+Create the `.env` file:
 
 ```bash
-# Generate a secure session secret — copy the output
-openssl rand -base64 32
-
 nano .env
 ```
 
-Paste the following, replacing the placeholder with your generated secret:
+Paste in the following, replacing the session secret with the output of `openssl rand -base64 32`:
 
 ```env
 DATABASE_URL="postgresql://postgres:postgres@db:5432/assetdb"
-SESSION_SECRET="paste-your-generated-secret-here"
-```
-
-Save and exit with `Ctrl+X`, `Y`, `Enter`.
-
-#### 4. Build and start
-
-```bash
-docker compose up --build
-```
-
-> **The first build takes a while.** It compiles the full Next.js app including TypeScript checking. On a low-spec machine (LXC, VPS, Raspberry Pi) expect 5–15 minutes. It is not frozen — just wait for `Starting Asset Tracker...` to appear in the logs.
-
-Once running, open `http://your-server-ip:3000`. On first load you will be prompted to create the first admin account.
-
-To run in the background (recommended for production):
-
-```bash
-docker compose up --build -d
-```
-
-To stop:
-
-```bash
-docker compose down
-```
-
-> **Data persistence:** The database and uploaded photos are stored in Docker volumes (`db_data` and `uploads`) and survive container restarts and rebuilds.
-
-#### Updating (Docker)
-
-```bash
-git pull
-
-# Re-apply the entrypoint fix in case it changed upstream
-cat > docker-entrypoint.sh << 'EOF'
-#!/bin/sh
-set -e
-
-echo "Waiting for database..."
-until echo "SELECT 1" | npx prisma db execute --stdin > /dev/null 2>&1; do
-  sleep 1
-done
-
-echo "Running database migrations..."
-npx prisma migrate deploy
-
-echo "Starting Asset Tracker..."
-exec node server.mjs
-EOF
-
-docker compose up --build -d
-```
-
-Migrations run automatically on startup and your data is untouched.
-
----
-
-### Option B — Guided setup script
-
-A script that walks you through configuration interactively.
-
-**Requirements:** Node.js 20+ and PostgreSQL 14+ already installed and running.
-
-```bash
-git clone https://github.com/danbasnett/AssetTracker.git
-cd AssetTracker
-bash setup.sh
-```
-
-The script will:
-1. Check that Node.js, npm, and `psql` are available
-2. Prompt you for your database host, port, name, user, and password
-3. Generate a secure `SESSION_SECRET` automatically
-4. Write a `.env` file
-5. Install npm dependencies
-6. Run Prisma database migrations
-
-Follow the instructions it prints at the end to start the app.
-
-> **Note:** If a `.env` file already exists, the script skips the environment setup step. Delete `.env` and re-run to reconfigure.
-
----
-
-### Option C — Manual setup
-
-Full control over every step.
-
-**Requirements:** Node.js 20+, PostgreSQL 14+
-
-```bash
-git clone https://github.com/danbasnett/AssetTracker.git
-cd AssetTracker
-npm install
-```
-
-Create a `.env` file:
-
-```bash
-nano .env
-```
-
-Paste in the following, filling in your values:
-
-```env
-DATABASE_URL="postgresql://user:password@localhost:5432/assetdb"
-SESSION_SECRET="<output of: openssl rand -base64 32>"
+SESSION_SECRET="your-secret-here"
 NODE_ENV="production"
 ```
 
-> **Connecting to a remote database:** replace `localhost` with the IP address of the machine running PostgreSQL.
-
-Run database migrations:
+Build and start:
 
 ```bash
-npx prisma migrate deploy
-```
-
-Start the app:
-
-```bash
-# Development (auto-reloads on file changes)
-npm run dev
-
-# Production
-npm run build && npm start
+docker compose up --build -d
 ```
 
 Open `http://localhost:3000`. On first load you will be prompted to create the first admin account.
 
+### Useful commands
+
+```bash
+docker compose logs -f          # stream logs
+docker compose down             # stop the app
+docker compose up -d            # start the app
+docker compose up --build -d    # rebuild and start (after git pull)
+```
+
 ---
 
-### Option D — Production on a Raspberry Pi or LXC (with PM2)
+## Manual Install (Node.js + PM2)
 
-Use this when you want the app to start automatically on boot and restart if it crashes, without Docker.
+Use this for a Raspberry Pi or LXC where you want the app to start on boot without Docker.
 
-#### 1. Install Node.js 20
-
-The default OS repositories may ship an older version. Install via NodeSource:
+### 1. Install Node.js 20
 
 ```bash
 curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
 sudo apt-get install -y nodejs
-node --version   # should print v20.x.x or higher
 ```
 
-#### 2. Install and start PostgreSQL
+### 2. Install PostgreSQL
 
 ```bash
 sudo apt install -y postgresql
-sudo systemctl enable postgresql
-sudo systemctl start postgresql
-```
-
-Create the database and a dedicated user:
-
-```bash
+sudo systemctl enable --now postgresql
 sudo -u postgres psql -c "CREATE USER assetuser WITH PASSWORD 'yourpassword';"
 sudo -u postgres psql -c "CREATE DATABASE assetdb OWNER assetuser;"
 ```
 
-#### 3. Clone and configure
+### 3. Clone and configure
 
 ```bash
 git clone https://github.com/danbasnett/AssetTracker.git
@@ -265,38 +142,35 @@ SESSION_SECRET="<output of: openssl rand -base64 32>"
 NODE_ENV="production"
 ```
 
-#### 4. Build and migrate
+### 4. Build and migrate
 
 ```bash
 npm run build
 npx prisma migrate deploy
 ```
 
-#### 5. Install PM2 and start the app
+### 5. Start with PM2
 
 ```bash
 sudo npm install -g pm2
-
 pm2 start ecosystem.config.cjs
-
-# Enable autostart on boot
 pm2 save
-pm2 startup   # run the command it prints to complete autostart setup
+pm2 startup    # run the command it prints to enable autostart on boot
 ```
 
-Useful PM2 commands:
+### Useful PM2 commands
 
 ```bash
-pm2 status                # check if the app is running
-pm2 logs assettracker     # view live logs
-pm2 restart assettracker  # restart after config changes
-pm2 stop assettracker     # stop the app
+pm2 status                # check if running
+pm2 logs assettracker     # view logs
+pm2 restart assettracker  # restart
+pm2 stop assettracker     # stop
 ```
 
-#### 6. Updating (PM2)
+### Updating (PM2)
 
 ```bash
-cd AssetTracker
+cd /path/to/AssetTracker
 git pull
 npm install
 npm run build
@@ -306,11 +180,9 @@ pm2 restart assettracker
 
 ---
 
-## HTTPS (optional, all install methods)
+## HTTPS (optional)
 
-Place SSL certificate files at `./certs/key.pem` and `./certs/cert.pem`. The server automatically switches to HTTPS when both files are present.
-
-To use custom paths, add these to `.env`:
+Place certificate files at `./certs/key.pem` and `./certs/cert.pem`. The server switches to HTTPS automatically when both are present. Override the paths in `.env`:
 
 ```env
 SSL_KEY_PATH=/path/to/key.pem
@@ -324,11 +196,11 @@ SSL_CERT_PATH=/path/to/cert.pem
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `DATABASE_URL` | Yes | PostgreSQL connection string |
-| `SESSION_SECRET` | Yes | Secret for signing session cookies (minimum 32 characters — generate with `openssl rand -base64 32`) |
+| `SESSION_SECRET` | Yes | Cookie signing secret — generate with `openssl rand -base64 32` (min 32 chars) |
 | `PORT` | No | Port to listen on (default: `3000`) |
 | `NODE_ENV` | No | Set to `production` for production deployments |
-| `SSL_KEY_PATH` | No | Path to SSL private key — enables HTTPS when set alongside `SSL_CERT_PATH` |
-| `SSL_CERT_PATH` | No | Path to SSL certificate — enables HTTPS when set alongside `SSL_KEY_PATH` |
+| `SSL_KEY_PATH` | No | Path to SSL private key (enables HTTPS when paired with `SSL_CERT_PATH`) |
+| `SSL_CERT_PATH` | No | Path to SSL certificate (enables HTTPS when paired with `SSL_KEY_PATH`) |
 
 ---
 
@@ -354,23 +226,13 @@ A full user manual is available in [`MANUAL.md`](./MANUAL.md) and as an interact
 ## Project Structure
 
 ```
-app/              # Next.js app directory (pages + server actions)
-  actions.ts      # All server actions (create/update/delete operations)
-  page.tsx        # Dashboard
-  assets/         # Asset management
-  locations/      # Location management
-  items/          # Consumables
-  people/         # People/assignees
-  maintenance/    # Maintenance scheduling
-  allocations/    # Allocation plans
-  kits/           # Kit management
-  audit/          # Audit log (admin only)
-  settings/       # Settings (admin only)
-  help/           # Interactive user manual
-components/       # Shared React components
-lib/              # Prisma client, session helpers, audit logging
-prisma/           # Schema and migrations
-public/uploads/   # Uploaded photos and avatars
-server.mjs        # Custom Node.js server with HTTPS and daily cron
+app/                  # Next.js app directory (pages + server actions)
+components/           # Shared React components
+lib/                  # Prisma client, session helpers, audit logging
+prisma/               # Schema and migrations
+public/uploads/       # Uploaded photos and avatars
+server.mjs            # Custom Node.js server with HTTPS and daily cron
 ecosystem.config.cjs  # PM2 process config
+install.sh            # One-command installer
+docker-entrypoint.sh  # Docker container startup script
 ```
