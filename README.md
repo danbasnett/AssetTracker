@@ -38,27 +38,69 @@ Choose the method that best fits your environment.
 
 The easiest path. PostgreSQL is included — you don't need to install or configure it separately.
 
-**Requirements:** [Docker Desktop](https://www.docker.com/products/docker-desktop/) (or Docker Engine + Compose on Linux)
+#### 1. Install Docker
+
+**Mac/Windows:** Install [Docker Desktop](https://www.docker.com/products/docker-desktop/).
+
+**Linux (including LXC/VPS):**
+```bash
+apt install docker.io docker-compose -y
+systemctl enable docker
+systemctl start docker
+```
+
+#### 2. Clone the repo and fix the entrypoint script
+
+> **Known issue:** `docker-entrypoint.sh` uses a bash feature (`<<<`) that isn't supported by the Alpine shell inside the container. The fix below rewrites it correctly.
 
 ```bash
 git clone https://github.com/danbasnett/AssetTracker.git
 cd AssetTracker
 
-# Generate a secure session secret
-openssl rand -base64 32
+cat > docker-entrypoint.sh << 'EOF'
+#!/bin/sh
+set -e
 
-# Copy the example env file and edit it
-cp .env.example .env
-nano .env   # set SESSION_SECRET to the value generated above
+echo "Waiting for database..."
+until echo "SELECT 1" | npx prisma db execute --stdin > /dev/null 2>&1; do
+  sleep 1
+done
+
+echo "Running database migrations..."
+npx prisma migrate deploy
+
+echo "Starting Asset Tracker..."
+exec node server.mjs
+EOF
 ```
 
-Then start the app:
+#### 3. Create the `.env` file
+
+```bash
+# Generate a secure session secret — copy the output
+openssl rand -base64 32
+
+nano .env
+```
+
+Paste the following, replacing the placeholder with your generated secret:
+
+```env
+DATABASE_URL="postgresql://postgres:postgres@db:5432/assetdb"
+SESSION_SECRET="paste-your-generated-secret-here"
+```
+
+Save and exit with `Ctrl+X`, `Y`, `Enter`.
+
+#### 4. Build and start
 
 ```bash
 docker compose up --build
 ```
 
-Open http://localhost:3000. On first load you will be prompted to create the first admin account.
+> **The first build takes a while.** It compiles the full Next.js app including TypeScript checking. On a low-spec machine (LXC, VPS, Raspberry Pi) expect 5–15 minutes. It is not frozen — just wait for `Starting Asset Tracker...` to appear in the logs.
+
+Once running, open `http://your-server-ip:3000`. On first load you will be prompted to create the first admin account.
 
 To run in the background (recommended for production):
 
@@ -78,10 +120,28 @@ docker compose down
 
 ```bash
 git pull
+
+# Re-apply the entrypoint fix in case it changed upstream
+cat > docker-entrypoint.sh << 'EOF'
+#!/bin/sh
+set -e
+
+echo "Waiting for database..."
+until echo "SELECT 1" | npx prisma db execute --stdin > /dev/null 2>&1; do
+  sleep 1
+done
+
+echo "Running database migrations..."
+npx prisma migrate deploy
+
+echo "Starting Asset Tracker..."
+exec node server.mjs
+EOF
+
 docker compose up --build -d
 ```
 
-The new image is built, database migrations run automatically, and your data is untouched. The app will be briefly unavailable during the restart (usually under a minute).
+Migrations run automatically on startup and your data is untouched.
 
 ---
 
@@ -123,21 +183,21 @@ cd AssetTracker
 npm install
 ```
 
-Copy `.env.example` to `.env` and fill in the values:
+Create a `.env` file:
 
 ```bash
-cp .env.example .env
 nano .env
 ```
 
-The two required values are:
+Paste in the following, filling in your values:
 
 ```env
 DATABASE_URL="postgresql://user:password@localhost:5432/assetdb"
 SESSION_SECRET="<output of: openssl rand -base64 32>"
+NODE_ENV="production"
 ```
 
-> **Connecting to a remote database** (e.g. a separate Raspberry Pi running PostgreSQL): replace `localhost` in `DATABASE_URL` with that machine's IP address.
+> **Connecting to a remote database:** replace `localhost` with the IP address of the machine running PostgreSQL.
 
 Run database migrations:
 
@@ -155,19 +215,17 @@ npm run dev
 npm run build && npm start
 ```
 
-Open http://localhost:3000. On first load you will be prompted to create the first admin account.
+Open `http://localhost:3000`. On first load you will be prompted to create the first admin account.
 
 ---
 
-### Option D — Production on a Raspberry Pi (with PM2)
+### Option D — Production on a Raspberry Pi or LXC (with PM2)
 
-Use this approach for a headless Raspberry Pi where you want the app to start automatically on boot and restart if it crashes.
-
-**Requirements:** Node.js 20+, PostgreSQL 14+, PM2
+Use this when you want the app to start automatically on boot and restart if it crashes, without Docker.
 
 #### 1. Install Node.js 20
 
-The default Raspberry Pi OS repositories may ship an older version. Install via NodeSource:
+The default OS repositories may ship an older version. Install via NodeSource:
 
 ```bash
 curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
@@ -183,24 +241,23 @@ sudo systemctl enable postgresql
 sudo systemctl start postgresql
 ```
 
-Create the database and user:
+Create the database and a dedicated user:
 
 ```bash
 sudo -u postgres psql -c "CREATE USER assetuser WITH PASSWORD 'yourpassword';"
 sudo -u postgres psql -c "CREATE DATABASE assetdb OWNER assetuser;"
 ```
 
-#### 3. Clone and configure the app
+#### 3. Clone and configure
 
 ```bash
 git clone https://github.com/danbasnett/AssetTracker.git
 cd AssetTracker
 npm install
-cp .env.example .env
 nano .env
 ```
 
-Set the following in `.env`:
+Paste in:
 
 ```env
 DATABASE_URL="postgresql://assetuser:yourpassword@localhost:5432/assetdb"
@@ -220,24 +277,23 @@ npx prisma migrate deploy
 ```bash
 sudo npm install -g pm2
 
-# Start using the included PM2 config
 pm2 start ecosystem.config.cjs
 
-# Save the process list and enable startup on boot
+# Enable autostart on boot
 pm2 save
-pm2 startup   # follow the command it prints to enable autostart
+pm2 startup   # run the command it prints to complete autostart setup
 ```
 
 Useful PM2 commands:
 
 ```bash
-pm2 status              # check if the app is running
-pm2 logs assettracker   # view live logs
-pm2 restart assettracker
-pm2 stop assettracker
+pm2 status                # check if the app is running
+pm2 logs assettracker     # view live logs
+pm2 restart assettracker  # restart after config changes
+pm2 stop assettracker     # stop the app
 ```
 
-#### 6. Updating (Raspberry Pi / PM2)
+#### 6. Updating (PM2)
 
 ```bash
 cd AssetTracker
@@ -254,7 +310,7 @@ pm2 restart assettracker
 
 Place SSL certificate files at `./certs/key.pem` and `./certs/cert.pem`. The server automatically switches to HTTPS when both files are present.
 
-To use custom paths, set these in `.env`:
+To use custom paths, add these to `.env`:
 
 ```env
 SSL_KEY_PATH=/path/to/key.pem
@@ -268,7 +324,7 @@ SSL_CERT_PATH=/path/to/cert.pem
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `DATABASE_URL` | Yes | PostgreSQL connection string |
-| `SESSION_SECRET` | Yes | Secret for signing session cookies (minimum 32 characters) |
+| `SESSION_SECRET` | Yes | Secret for signing session cookies (minimum 32 characters — generate with `openssl rand -base64 32`) |
 | `PORT` | No | Port to listen on (default: `3000`) |
 | `NODE_ENV` | No | Set to `production` for production deployments |
 | `SSL_KEY_PATH` | No | Path to SSL private key — enables HTTPS when set alongside `SSL_CERT_PATH` |
